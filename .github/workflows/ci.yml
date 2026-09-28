@@ -1,0 +1,56 @@
+name: Go checks
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  go:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: go.mod
+          cache: true
+      - name: Format
+        run: test -z "$(gofmt -l ./cmd ./internal ./test ./examples)"
+      - name: Generated Ent code
+        run: |
+          go generate ./internal/store
+          git diff --exit-code -- internal/store/ent
+      - name: Test with race detector
+        run: go test -race ./...
+      - name: Vet
+        run: go vet ./...
+      - name: Staticcheck
+        run: go run honnef.co/go/tools/cmd/staticcheck@v0.8.1 ./...
+      - name: Vulnerability check
+        run: go run golang.org/x/vuln/cmd/govulncheck@v1.8.0 ./...
+      - name: Integration build and static checks
+        run: |
+          go test -tags integration -run '^$' ./test/...
+          go vet -tags integration ./...
+
+  docker-boundary:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: go.mod
+          cache: true
+      - name: Build pinned agent image
+        run: docker build -f Containerfile -t turnyard-agent:ci .
+      - name: Real Docker sandbox and gateway boundaries
+        env:
+          TURNYARD_INTEGRATION_BACKEND: docker
+          TURNYARD_INTEGRATION_IMAGE: turnyard-agent:ci
+          TURNYARD_NETWORK_E2E: '1'
+          TURNYARD_E2E_IMAGE: turnyard-agent:ci
+        run: |
+          go test -count=1 -run '^TestRealSandboxFaults$' ./internal/sandbox
+          go test -tags integration -count=1 -run '^Test(ModelOnlyDockerBoundary|ModelGatewayCannotBeUsedFromBridge|ToolGatewayKeepsCredentialOutsideAgent)$' ./internal/sandbox

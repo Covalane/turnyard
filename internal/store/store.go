@@ -1,0 +1,202 @@
+package store
+
+import (
+	"context"
+	"database/sql"
+	"encoding/json"
+	"errors"
+	"os"
+	"path/filepath"
+	"time"
+
+	"entgo.io/ent/dialect"
+	entsql "entgo.io/ent/dialect/sql"
+	"github.com/Covalane/turnyard/internal/store/ent"
+	_ "modernc.org/sqlite"
+)
+
+// Store is the only persistence boundary visible to the engine. Its Ent client
+// and migration SQL stay private to this package.
+type Store struct {
+	Root   string
+	client *ent.Client
+}
+
+// DatabaseFileName is the on-disk state database used by the store and offline backups.
+const DatabaseFileName = "turnyard.sqlite3"
+
+func OpenStore(ctx context.Context, root string) (*Store, error) {
+	abs, err := filepath.Abs(root)
+	if err != nil {
+		return nil, err
+	}
+	if err := os.MkdirAll(abs, 0o700); err != nil {
+		return nil, err
+	}
+	if err := os.Chmod(abs, 0o700); err != nil {
+		return nil, err
+	}
+	db, err := sql.Open("sqlite", filepath.Join(abs, DatabaseFileName))
+	if err != nil {
+		return nil, err
+	}
+	db.SetMaxOpenConns(1)
+	db.SetConnMaxLifetime(0)
+	if _, err := db.ExecContext(ctx, "PRAGMA foreign_keys=ON; PRAGMA busy_timeout=30000; PRAGMA journal_mode=WAL"); err != nil {
+		return nil, errors.Join(err, db.Close())
+	}
+	client := ent.NewClient(ent.Driver(entsql.OpenDB(dialect.SQLite, db)))
+	if err := client.Schema.Create(ctx); err != nil {
+		return nil, errors.Join(err, client.Close())
+	}
+	if err := migrateTaskBases(ctx, db); err != nil {
+		return nil, errors.Join(err, client.Close())
+	}
+	return &Store{Root: abs, client: client}, nil
+}
+
+// migrateTaskBases imports the old composite-key table once. All normal reads
+// and writes use Ent; this path is kept solely for existing workspaces.
+func migrateTaskBases(ctx context.Context, db *sql.DB) error {
+	var oldTable string
+	err := db.QueryRowContext(ctx, "SELECT name FROM sqlite_master WHERE type='table' AND name='task_repositories'").Scan(&oldTable)
+	if err == sql.ErrNoRows {
+		return nil
+	}
+	if err != nil {
+		return err
+	}
+	_, err = db.ExecContext(ctx, `INSERT OR IGNORE INTO task_bases(id,task_id,repo_id,base_commit)
+        SELECT task_id || ':' || repo_id,task_id,repo_id,base_commit FROM task_repositories`)
+	return err
+}
+
+func (s *Store) Close() error { return s.client.Close() }
+func now() float64            { return float64(time.Now().UnixNano()) / 1e9 }
+func jsonText(value any) (string, error) {
+	data, err := json.Marshal(value)
+	if err != nil {
+		return "", err
+	}
+	return string(data), nil
+}
+
+type SessionRow struct {
+	ID                      string         `json:"id"`
+	Spec                    string         `json:"spec"`
+	Environment             string         `json:"environment"`
+	EnvironmentDigest       string         `json:"environment_digest"`
+	Workspace               string         `json:"workspace"`
+	Status                  string         `json:"status"`
+	NativeID                OptionalString `json:"native_id"`
+	CreatedAt               float64        `json:"created_at"`
+	CompletedAt             OptionalFloat  `json:"completed_at"`
+	CancelledAt             OptionalFloat  `json:"cancelled_at"`
+	CancelReason            OptionalString `json:"cancel_reason"`
+	ParentSessionID         OptionalString `json:"parent_session_id"`
+	ParentTaskID            OptionalString `json:"parent_task_id"`
+	ParentInvocationID      OptionalString `json:"parent_invocation_id"`
+	DelegateAgentID         OptionalString `json:"delegate_agent_id"`
+	DelegationRequestDigest OptionalString `json:"delegation_request_digest"`
+}
+
+// TurnRow is a persisted user or agent turn exposed without Ent types.
+type TurnRow struct {
+	ID           string  `json:"id"`
+	TaskID       string  `json:"task_id"`
+	Sequence     int     `json:"sequence"`
+	Input        string  `json:"input"`
+	Status       string  `json:"status"`
+	InvocationID string  `json:"invocation_id"`
+	CreatedAt    float64 `json:"created_at"`
+}
+
+// EventRow is an ordered state change in a session.
+type EventRow struct {
+	Sequence  int64   `json:"sequence"`
+	SessionID string  `json:"session_id"`
+	TaskID    *string `json:"task_id"`
+	Type      string  `json:"type"`
+	Payload   string  `json:"payload"`
+	CreatedAt float64 `json:"created_at"`
+}
+
+func nullableString(x OptionalString) any {
+	if x.Present {
+		return x.Value
+	}
+	return nil
+}
+func nullableInt(x OptionalInt) any {
+	if x.Present {
+		return x.Value
+	}
+	return nil
+}
+func nullableFloat(x OptionalFloat) any {
+	if x.Present {
+		return x.Value
+	}
+	return nil
+}
+func (x SessionRow) MarshalJSON() ([]byte, error) {
+	return json.Marshal(map[string]any{"id": x.ID, "spec": x.Spec, "environment": x.Environment,
+		"environment_digest": x.EnvironmentDigest, "workspace": x.Workspace, "status": x.Status,
+		"native_id": nullableString(x.NativeID), "created_at": x.CreatedAt, "completed_at": nullableFloat(x.CompletedAt),
+		"cancelled_at": nullableFloat(x.CancelledAt), "cancel_reason": nullableString(x.CancelReason),
+		"parent_session_id": nullableString(x.ParentSessionID), "parent_task_id": nullableString(x.ParentTaskID),
+		"parent_invocation_id": nullableString(x.ParentInvocationID), "delegate_agent_id": nullableString(x.DelegateAgentID),
+		"delegation_request_digest": nullableString(x.DelegationRequestDigest)})
+}
+
+type TaskRow struct {
+	ID             string         `json:"id"`
+	SessionID      string         `json:"session_id"`
+	Sequence       int            `json:"sequence"`
+	IdempotencyKey string         `json:"idempotency_key"`
+	Spec           string         `json:"spec"`
+	SpecDigest     string         `json:"spec_digest"`
+	Status         string         `json:"status"`
+	CandidateID    OptionalString `json:"candidate_id"`
+	ErrorCode      OptionalString `json:"error_code"`
+	CreatedAt      float64        `json:"created_at"`
+}
+
+func (x TaskRow) MarshalJSON() ([]byte, error) {
+	return json.Marshal(map[string]any{"id": x.ID, "session_id": x.SessionID, "sequence": x.Sequence,
+		"idempotency_key": x.IdempotencyKey, "spec": x.Spec, "spec_digest": x.SpecDigest,
+		"status": x.Status, "candidate_id": nullableString(x.CandidateID),
+		"error_code": nullableString(x.ErrorCode), "created_at": x.CreatedAt})
+}
+
+type CandidateRow struct {
+	ID           string  `json:"id"`
+	TaskID       string  `json:"task_id"`
+	Vector       string  `json:"vector"`
+	Digest       string  `json:"digest"`
+	Checks       string  `json:"checks"`
+	Deliverables string  `json:"deliverables"`
+	Status       string  `json:"status"`
+	CreatedAt    float64 `json:"created_at"`
+}
+type InvocationRow struct {
+	ID             string         `json:"id"`
+	TurnID         string         `json:"turn_id"`
+	Runtime        string         `json:"runtime"`
+	Model          string         `json:"model"`
+	SandboxBackend string         `json:"sandbox_backend"`
+	Status         string         `json:"status"`
+	ExitCode       OptionalInt    `json:"exit_code"`
+	NativeID       OptionalString `json:"native_id"`
+	LogPath        OptionalString `json:"log_path"`
+	StartedAt      float64        `json:"started_at"`
+	EndedAt        OptionalFloat  `json:"ended_at"`
+}
+
+func (x InvocationRow) MarshalJSON() ([]byte, error) {
+	return json.Marshal(map[string]any{"id": x.ID, "turn_id": x.TurnID, "runtime": x.Runtime,
+		"model": x.Model, "sandbox_backend": x.SandboxBackend, "status": x.Status,
+		"exit_code": nullableInt(x.ExitCode), "native_id": nullableString(x.NativeID),
+		"log_path": nullableString(x.LogPath), "started_at": x.StartedAt,
+		"ended_at": nullableFloat(x.EndedAt)})
+}

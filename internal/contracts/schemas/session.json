@@ -1,0 +1,24 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schemaVersion", "idempotencyKey", "repositories", "environment", "primaryAgent"],
+  "properties": {
+    "schemaVersion": {"const": "turnyard.session/v1"},
+    "idempotencyKey": {"type": "string", "minLength": 1, "maxLength": 120},
+    "repositories": {"type": "array", "items": {"type": "object", "additionalProperties": false,
+      "required": ["id", "type", "commit"], "properties": {
+        "id": {"type": "string", "pattern": "^[a-z][a-z0-9_-]{0,39}$"},
+        "type": {"enum": ["local-git", "remote-git"]},
+        "path": {"type": "string", "minLength": 1},
+        "url": {"type": "string", "minLength": 1},
+        "pushUrl": {"type": "string", "minLength": 1},
+        "commit": {"type": "string", "pattern": "^[0-9a-f]{40}$"}
+      }, "oneOf": [
+        {"properties": {"type": {"const": "local-git"}}, "required": ["path"]},
+        {"properties": {"type": {"const": "remote-git"}}, "required": ["url"]}
+      ]}},
+    "environment": {"type": "string", "minLength": 1},
+    "primaryAgent": {"type": "string", "minLength": 1}
+  }
+}

@@ -1,0 +1,7 @@
+.venv
+.turnyard
+__pycache__
+*.pyc
+*.md
+turnyard/
+tests/
