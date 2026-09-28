@@ -52,6 +52,8 @@ The engine holds no SQL handle or transaction object: the store owns atomic sess
 
 Engine operations return explicit result types for session creation, task append and execution, verification, restoration, and completion. Store projects Ent entities into domain read models before transport serializes them as JSON. Task execution prepares Git branches, invokes the agent, records a candidate, and runs checks in separate stages; the sandbox backend owns mount and credential argument assembly.
 
+Session, Environment, and Work inputs and Turnyard-owned RPC fields use `lowerCamelCase`, as defined by their JSON schemas and versions. Native agent events, GitHub responses, and generated Ent code retain their upstream names. Some nested read models in `session show` and `task show` currently include `store` rows with `snake_case` fields such as `session_id`; these are part of the existing output contract. Unifying result fields requires a versioned output DTO and a compatibility path, rather than changing struct tags in place and silently breaking clients.
+
 The persistence model lives in `internal/store/ent/schema`; `go generate ./internal/store` regenerates `internal/store/ent`. Store projects generated entities into stable domain results and owns transaction boundaries. Opening an older workspace imports its `task_repositories` bases into `task_bases` once. The OpenCode driver separately reads OpenCode's own native SQLite session file to check model evidence; it is not Turnyard's business database.
 
 Model binding is separate from runtime selection, but arbitrary runtime/provider/model combinations are not supported. Each driver validates its own compatibility. The combinations with real end-to-end evidence are listed in [validation](validation.md).

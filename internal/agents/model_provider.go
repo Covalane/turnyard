@@ -57,30 +57,57 @@ var modelProviders = map[string]ModelProvider{
 	},
 }
 
+type providerOrigin uint8
+
+const (
+	providerBuiltIn providerOrigin = iota
+	providerCustom
+)
+
+// resolvedProvider keeps the provider's policy alongside its API profile.
+// Custom providers accept validated endpoint bindings; built-in providers do not.
+type resolvedProvider struct {
+	profile ModelProvider
+	origin  providerOrigin
+}
+
+func resolveProvider(binding contracts.ModelBinding) resolvedProvider {
+	if profile, exists := modelProviders[binding.Provider]; exists {
+		return resolvedProvider{profile: profile, origin: providerBuiltIn}
+	}
+	return resolvedProvider{origin: providerCustom, profile: ModelProvider{
+		Name: binding.Provider, CredentialEnvs: []string{binding.CredentialEnv}, Endpoints: map[ModelWire]string{
+			WireOpenAIChat: binding.Endpoints.OpenAIChat, WireAnthropic: binding.Endpoints.Anthropic,
+			WireResponses: binding.Endpoints.Responses,
+		},
+	}}
+}
+
+func (provider resolvedProvider) endpointFor(binding contracts.ModelBinding, wire ModelWire) (string, error) {
+	if provider.origin == providerBuiltIn && binding.Endpoints != (contracts.ModelEndpoints{}) {
+		return "", fault.New(fault.CodeModelUnavailable, "built-in provider %s does not accept endpoint overrides", binding.Provider)
+	}
+	if !slices.Contains(provider.profile.CredentialEnvs, binding.CredentialEnv) {
+		return "", fault.New(fault.CodeModelUnavailable, "provider %s has no valid credential binding", binding.Provider)
+	}
+	endpoint := provider.profile.Endpoints[wire]
+	if endpoint == "" {
+		return "", fault.New(fault.CodeModelUnavailable, "provider %s does not support %s", binding.Provider, wire)
+	}
+	if provider.origin == providerCustom && !contracts.ValidModelEndpoint(endpoint) {
+		return "", fault.New(fault.CodeModelUnavailable, "custom provider %s requires a plain HTTPS endpoint", binding.Provider)
+	}
+	return endpoint, nil
+}
+
 func ProviderFor(binding contracts.ModelBinding, wire ModelWire) (ModelProvider, string, error) {
-	profile, ok := modelProviders[binding.Provider]
 	if binding.Model == "" || binding.CredentialEnv == "" {
 		return ModelProvider{}, "", fault.New(fault.CodeModelUnavailable, "provider %s has no valid model and credential binding", binding.Provider)
 	}
-	if !ok {
-		profile = ModelProvider{Name: binding.Provider, CredentialEnvs: []string{binding.CredentialEnv}, Endpoints: map[ModelWire]string{
-			WireOpenAIChat: binding.Endpoints.OpenAIChat, WireAnthropic: binding.Endpoints.Anthropic,
-			WireResponses: binding.Endpoints.Responses,
-		}}
-	} else if binding.Endpoints != (contracts.ModelEndpoints{}) {
-		return ModelProvider{}, "", fault.New(fault.CodeModelUnavailable, "built-in provider %s does not accept endpoint overrides", binding.Provider)
+	provider := resolveProvider(binding)
+	endpoint, err := provider.endpointFor(binding, wire)
+	if err != nil {
+		return ModelProvider{}, "", err
 	}
-	if !slices.Contains(profile.CredentialEnvs, binding.CredentialEnv) {
-		return ModelProvider{}, "", fault.New(fault.CodeModelUnavailable, "provider %s has no valid credential binding", binding.Provider)
-	}
-	endpoint := profile.Endpoints[wire]
-	if endpoint == "" {
-		return ModelProvider{}, "", fault.New(fault.CodeModelUnavailable, "provider %s does not support %s", binding.Provider, wire)
-	}
-	if !ok {
-		if !contracts.ValidModelEndpoint(endpoint) {
-			return ModelProvider{}, "", fault.New(fault.CodeModelUnavailable, "custom provider %s requires a plain HTTPS endpoint", binding.Provider)
-		}
-	}
-	return profile, endpoint, nil
+	return provider.profile, endpoint, nil
 }

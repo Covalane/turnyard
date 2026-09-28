@@ -221,7 +221,7 @@ func (d *delegationServer) submit(ctx context.Context, key string, req delegatio
 }
 
 func (d *delegationServer) validateScope(scope []contracts.ScopeRepo) error {
-	parent := map[string]contracts.ScopeMode{}
+	parent := parentRepositoryScope{}
 	for _, item := range d.parent.work.Scope.Repositories {
 		parent[item.ID] = item.Mode
 	}
@@ -230,13 +230,29 @@ func (d *delegationServer) validateScope(scope []contracts.ScopeRepo) error {
 	}
 	seen := map[string]bool{}
 	for _, item := range scope {
-		mode, ok := parent[item.ID]
-		if !ok || seen[item.ID] || item.Mode != contracts.ScopeRead && item.Mode != contracts.ScopeWrite || mode == contracts.ScopeRead && item.Mode == contracts.ScopeWrite {
+		if seen[item.ID] || !parent.allows(item) {
 			return fault.New(fault.CodeScopeViolation, "delegation exceeds parent repository scope")
 		}
 		seen[item.ID] = true
 	}
 	return nil
+}
+
+type parentRepositoryScope map[string]contracts.ScopeMode
+
+func (parent parentRepositoryScope) allows(item contracts.ScopeRepo) bool {
+	mode, exists := parent[item.ID]
+	if !exists {
+		return false
+	}
+	switch mode {
+	case contracts.ScopeRead:
+		return item.Mode == contracts.ScopeRead
+	case contracts.ScopeWrite:
+		return item.Mode == contracts.ScopeRead || item.Mode == contracts.ScopeWrite
+	default:
+		return false
+	}
 }
 
 func (d *delegationServer) find(ctx context.Context, key string) (store.SessionRow, store.TaskRow, error) {

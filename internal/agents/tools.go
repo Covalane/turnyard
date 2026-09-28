@@ -138,6 +138,14 @@ func usesToolSidecar(env contracts.EnvironmentSpec) bool {
 	return env.Sandbox.Backend == sandbox.BackendDocker && env.Sandbox.Network != contracts.SandboxNetworkNone
 }
 
+func requiredCredential(capability, name string) (string, error) {
+	value, exists := os.LookupEnv(name)
+	if !exists || value == "" {
+		return "", fault.New(fault.CodeAuthUnavailable, "%s requires %s", capability, name)
+	}
+	return value, nil
+}
+
 // ToolGatewayFor gives the sandbox the credentialed gateway configuration.
 // The agent-side MCP proxy receives neither these values nor backend commands.
 func ToolGatewayFor(input AgentInvocation, agent contracts.AgentSpec) (*sandbox.ToolGateway, error) {
@@ -151,9 +159,9 @@ func ToolGatewayFor(input AgentInvocation, agent contracts.AgentSpec) (*sandbox.
 			return nil, err
 		}
 		for _, name := range tool.PassEnv {
-			value, ok := os.LookupEnv(name)
-			if !ok || value == "" {
-				return nil, fault.New(fault.CodeAuthUnavailable, "tool %s requires %s", id, name)
+			value, err := requiredCredential("tool "+id, name)
+			if err != nil {
+				return nil, err
 			}
 			credentials[name] = value
 		}
@@ -163,9 +171,9 @@ func ToolGatewayFor(input AgentInvocation, agent contracts.AgentSpec) (*sandbox.
 		if err != nil {
 			return nil, err
 		}
-		value, ok := os.LookupEnv(matcher.CredentialEnv)
-		if !ok || value == "" {
-			return nil, fault.New(fault.CodeAuthUnavailable, "tool search requires %s", matcher.CredentialEnv)
+		value, err := requiredCredential("tool search", matcher.CredentialEnv)
+		if err != nil {
+			return nil, err
 		}
 		credentials[matcher.CredentialEnv] = value
 	}
@@ -189,9 +197,9 @@ func RuntimeCredentials(agent contracts.AgentSpec, env contracts.EnvironmentSpec
 			if env.Sandbox.Network == contracts.SandboxNetworkModelOnly {
 				return nil, fault.New(fault.CodeCapabilityMissing, "model-only cannot expose tool %s credentials to the agent", id)
 			}
-			value, ok := os.LookupEnv(name)
-			if !ok || value == "" {
-				return nil, fault.New(fault.CodeAuthUnavailable, "tool %s requires %s", id, name)
+			value, err := requiredCredential("tool "+id, name)
+			if err != nil {
+				return nil, err
 			}
 			if existing, ok := result[name]; ok && existing != value {
 				return nil, fault.New(fault.CodeInvalidSpec, "tool %s credential conflicts with model binding", id)
@@ -204,9 +212,9 @@ func RuntimeCredentials(agent contracts.AgentSpec, env contracts.EnvironmentSpec
 		if err != nil {
 			return nil, err
 		}
-		value, ok := os.LookupEnv(matcher.CredentialEnv)
-		if !ok || value == "" {
-			return nil, fault.New(fault.CodeAuthUnavailable, "tool search requires %s", matcher.CredentialEnv)
+		value, err := requiredCredential("tool search", matcher.CredentialEnv)
+		if err != nil {
+			return nil, err
 		}
 		result[matcher.CredentialEnv] = value
 	}

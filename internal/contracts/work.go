@@ -73,7 +73,7 @@ func ValidateWorkSpec(work WorkSpec, session SessionSpec, env EnvironmentSpec) (
 	for _, r := range work.Scope.Repositories {
 		writable[r.ID] = r.Mode == ScopeWrite
 	}
-	connectors := map[string]ArtifactConnectorSpec{}
+	connectors := connectorCatalog{}
 	for _, connector := range env.ArtifactConnectors {
 		connectors[connector.ID] = connector
 	}
@@ -108,8 +108,7 @@ func ValidateWorkSpec(work WorkSpec, session SessionSpec, env EnvironmentSpec) (
 				return work, fault.New(fault.CodeInvalidSpec, "input %s HTTPS host is not allowed", input.ID)
 			}
 		case InputConnector:
-			connector, ok := connectors[source.Connector]
-			if !ok || !ValidConnectorURI(connector, source.URI) || source.Path != "" || source.URL != "" || input.ExpectedSHA256 == "" {
+			if !connectors.canRead(source.Connector, source.URI) || source.Path != "" || source.URL != "" || input.ExpectedSHA256 == "" {
 				return work, fault.New(fault.CodeInvalidSpec, "input %s requires a pinned configured connector source", input.ID)
 			}
 		default:
@@ -174,7 +173,7 @@ func validMediaType(value string) bool {
 	return err == nil && strings.Contains(parsed, "/")
 }
 
-func validateDestination(item DeliverableSpec, connectors map[string]ArtifactConnectorSpec) error {
+func validateDestination(item DeliverableSpec, connectors connectorCatalog) error {
 	if item.Destination == nil {
 		return nil
 	}
@@ -185,12 +184,26 @@ func validateDestination(item DeliverableSpec, connectors map[string]ArtifactCon
 			return nil
 		}
 	case DestinationConnector:
-		connector, ok := connectors[dest.Connector]
-		if ok && len(connector.PutArgv) > 0 && strings.Count(dest.URI, "{sha256}") == 1 && ValidConnectorURI(connector, strings.Replace(dest.URI, "{sha256}", strings.Repeat("0", 64), 1)) {
+		if connectors.canWrite(dest.Connector, dest.URI) {
 			return nil
 		}
 	}
 	return fault.New(fault.CodeInvalidSpec, "deliverable %s has invalid destination", item.ID)
+}
+
+type connectorCatalog map[string]ArtifactConnectorSpec
+
+func (catalog connectorCatalog) canRead(id, uri string) bool {
+	connector, exists := catalog[id]
+	return exists && ValidConnectorURI(connector, uri)
+}
+
+func (catalog connectorCatalog) canWrite(id, uri string) bool {
+	connector, exists := catalog[id]
+	if !exists || len(connector.PutArgv) == 0 || strings.Count(uri, "{sha256}") != 1 {
+		return false
+	}
+	return ValidConnectorURI(connector, strings.Replace(uri, "{sha256}", strings.Repeat("0", 64), 1))
 }
 
 func safeDeliverablePath(path string) bool {

@@ -34,3 +34,22 @@ func TestConnectorURIPrefixCannotEscapeOrChangeAuthority(t *testing.T) {
 		}
 	}
 }
+
+func TestConnectorCatalogSeparatesReadAndWriteCapabilities(t *testing.T) {
+	catalog := connectorCatalog{"read": {URIPrefix: "oss://bucket/allowed/"},
+		"write": {URIPrefix: "oss://bucket/allowed/", PutArgv: []string{"ossutil", "cp"}}}
+	if !catalog.canRead("read", "oss://bucket/allowed/input.png") || catalog.canWrite("read", "oss://bucket/allowed/{sha256}.png") {
+		t.Fatal("read-only connector gained write access or lost read access")
+	}
+	if !catalog.canWrite("write", "oss://bucket/allowed/{sha256}.png") {
+		t.Fatal("write connector rejected a content-addressed destination")
+	}
+	for _, uri := range []string{"oss://bucket/allowed/output.png", "oss://bucket/private/{sha256}.png", "oss://bucket/allowed/{sha256}/{sha256}.png"} {
+		if catalog.canWrite("write", uri) {
+			t.Fatalf("invalid connector destination was accepted: %s", uri)
+		}
+	}
+	if catalog.canRead("missing", "oss://bucket/allowed/input.png") {
+		t.Fatal("missing connector was accepted")
+	}
+}

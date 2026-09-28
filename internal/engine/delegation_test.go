@@ -39,6 +39,20 @@ func TestDelegationRequestRootRejectsEscapingSymlink(t *testing.T) {
 	}
 }
 
+func TestParentRepositoryScopeAllowsReadDowngrade(t *testing.T) {
+	parent := parentRepositoryScope{"read": contracts.ScopeRead, "write": contracts.ScopeWrite, "invalid": "invalid"}
+	for _, item := range []contracts.ScopeRepo{{ID: "read", Mode: contracts.ScopeRead}, {ID: "write", Mode: contracts.ScopeRead}, {ID: "write", Mode: contracts.ScopeWrite}} {
+		if !parent.allows(item) {
+			t.Fatalf("valid child scope rejected: %+v", item)
+		}
+	}
+	for _, item := range []contracts.ScopeRepo{{ID: "read", Mode: contracts.ScopeWrite}, {ID: "missing", Mode: contracts.ScopeRead}, {ID: "write", Mode: "invalid"}, {ID: "invalid", Mode: contracts.ScopeRead}} {
+		if parent.allows(item) {
+			t.Fatalf("invalid child scope accepted: %+v", item)
+		}
+	}
+}
+
 func TestDelegationRequestFIFOIsRejectedWithoutBlocking(t *testing.T) {
 	requestDir := t.TempDir()
 	root, err := os.OpenRoot(requestDir)

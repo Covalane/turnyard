@@ -50,6 +50,8 @@ Turnyard 的边界是一台机器及其状态目录。上层系统决定任务�
 
 执行器对创建会话、追加任务、运行任务、复验、恢复与完成等操作返回显式结果类型；持久层将 Ent 实体转换为领域读模型，再由传输层序列化为 JSON。任务执行依次准备 Git 分支、调用代理、固化候选和运行检查；沙箱把挂载与凭据参数组装收在后端内部。
 
+Session、Environment、Work 输入和 Turnyard 自定义的 RPC 字段使用 `lowerCamelCase`，以各自的 JSON Schema 和版本号为准。代理原生事件、GitHub 响应及 Ent 生成代码保留来源系统的字段名。目前 `session show`、`task show` 的部分嵌套读模型直接包含 `store` 行，因此仍有 `session_id` 等 `snake_case` 字段；这些也是现有输出契约的一部分。若统一结果字段，应新增版本化的输出 DTO 并提供兼容路径，不能只改 struct tag 使旧客户端静默失效。
+
 存储模型由 `internal/store/ent/schema` 定义，`go generate ./internal/store` 再生成为 `internal/store/ent`。`store` 把生成实体转换成稳定的领域结果，并拥有事务边界。打开已有工作区时会把旧的 `task_repositories` 基准数据一次性导入 `task_bases`，重复打开不会重复写入。OpenCode 驱动读取的是该 CLI 自己的原生 SQLite 会话文件，不属于 Turnyard 的业务数据库，按其原生格式只读校验模型证据。
 
 模型绑定与代理 ID 分离，但**不是任意运行时与任意模型都可组合**。每个驱动负责验证自己的提供方兼容性；当前通过真实链路的组合见[验证记录](validation.md)。
