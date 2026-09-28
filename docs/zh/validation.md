@@ -2,6 +2,20 @@
 
 [使用指南](README.md) · [English](../en/validation.md)
 
+## 先看当前结论
+
+以下是截至 2026-09-28 的证据范围。后文按时间保留实验和失败记录；早期段落中的“尚未验证”应结合后续复验阅读。
+
+| 范围 | 结论 |
+| --- | --- |
+| 提交 `da2bcdb` 的公开 CI | Go race 测试、Vet、Staticcheck、Govulncheck、Ent 再生、Linux x64 镜像构建及 Docker 边界探针通过；CI 不调用云模型 |
+| Docker `model-only` | OpenCode 云模型任务、工具网关、凭据与网络边界，以及主子委派和中断恢复有真实验证记录；最终 x64 镜像上的四代理完整矩阵尚未重跑 |
+| Apple `container`、Podman | 最终工具网关的 OpenCode 单任务链路通过；Podman rootless 完整任务及 macOS 虚拟机未通过 |
+| gVisor | 嵌套 Linux 标准 cgroup 下的资源限额、完整单任务和边界探针通过；同配置的主子委派两次在父代理连接模型时中断，未证明子任务链路 |
+| 真实 OSS | 上传与两次读回的摘要一致；删除测试对象被拒，完整 E2E 未通过，测试对象待授权清理 |
+
+项目尚未建立正式版本 tag；不同日期的证据对应不同源码与镜像，不能合并为一次全平台发布验收。
+
 验证环境：2026-09-26 至 28 日，macOS Apple Silicon，Go 1.27.1；`Containerfile` 使用 Node 26 基础镜像与固定版本的代理 CLI。任务调用真实云端模型与真实 OCI 容器；早期测试使用本机 Git 仓库，本轮另加入私有 GitHub 仓库的远端 Git 验证。早期链路使用 `turnyard-agent:0.3.0`，受管委派初次复验使用 `turnyard-agent:0.3.1`，严格网络及多运行时复验使用 `turnyard-agent:0.3.2`；业务数据库使用 Ent v0.14.6 与 SQLite。以下按日期保留不同代码阶段的验证记录；被忽略的 `.turnyard/` 证据只存在于执行机器，不随仓库发布。历史通过记录不自动证明后续修改后的工作树也通过同一真实链路。
 
 ## 已留存的验证记录
@@ -67,7 +81,7 @@ TURNYARD_DELEGATION_RECOVERY_E2E=1 TURNYARD_E2E_BACKEND=docker TURNYARD_E2E_IMAG
 
 随后发现 Turnyard 曾把内部任务 ID 硬编码为 Git 提交标题。Codex 在 PR 分支上对 11 个提交做了**仅修改消息的历史整理**：逐项保留原文件树与顺序，当前 PR HEAD 为 `9c68e92764d7729f5372212ee1ac904ae907dff0`，原 HEAD `040062f10f7130dcbbb7192d28357750bde14a5d` 保存在私有备份分支 `archive/turnyard-auth-before-commit-titles`，本机映射记录为 `.turnyard/auth-validation-20260926/history-rewrite-map.json`。新 HEAD 的 GitHub Actions [push 检查](https://github.com/rwasayc/turnyard-auth/actions/runs/36253151118)和[PR 检查](https://github.com/rwasayc/turnyard-auth/actions/runs/36253153703)均通过。上面的 Turnyard 候选 SHA 与调用日志均指向**原始历史**；新 SHA 是 Codex 的历史整理结果，不应算作新的 Turnyard 验证。Turnyard 此后的任务输入可提供 `commitMessage`，任务 ID 改放在提交正文。
 
-尚未证明：Podman 真实链路、Kimi 的 DeepSeek/OpenAI 组合，以及不受信任务在宽泛出站网络下的安全性。Turnyard 的单机会话不支持跨机器或跨运行时迁移；任务分配、跨机器迁移和 PR 合并由外部系统负责。Ent 当前在打开数据库时执行追加式自动建表/迁移；后续对正式数据库结构做破坏性升级前，需要引入可审查的版本化迁移。聊天室验收只验证加入用户名后的消息路由，不证明身份认证或生产级私聊保密性。镜像与依赖为固定的已验证版本，固定版本不表示永远最新。
+在这一阶段尚未证明：Podman 真实链路、Kimi 的 DeepSeek/OpenAI 组合，以及不受信任务在宽泛出站网络下的安全性。Turnyard 的单机会话不支持跨机器或跨运行时迁移；任务分配、跨机器迁移和 PR 合并由外部系统负责。Ent 当前在打开数据库时执行追加式自动建表/迁移；后续对正式数据库结构做破坏性升级前，需要引入可审查的版本化迁移。聊天室验收只验证加入用户名后的消息路由，不证明身份认证或生产级私聊保密性。镜像与依赖为固定的已验证版本，固定版本不表示永远最新。
 
 统一产出清单的新增 Go 测试覆盖：旧文件格式兼容、短文本与 PNG 进入会话完成清单、缺少 PR 读回时阻止完成、错误 PR head 被拒绝、冻结的声明在复验时继续使用。使用已授权的 `gh` 对私有 `rwasayc/turnyard-auth` PR #1 做了只读真实读回，确认 URL、base、head 与状态。Docker + OpenCode + Ollama Cloud `glm-5.3-flash` 的新增真实链路也通过：任务同时产出 Git 文件与短文本，两项均为 `present`，会话完成清单包含它们；证据在 `.turnyard/output-go-20260927-012758-ba13e14807908942/evidence.json`。首次尝试将声明写入 `/state` 时被 OpenCode 的目录权限拒绝，任务按 `DELIVERABLE_MISSING` 失败；改用与 Git 仓库隔离的专用 `/workspace/.turnyard-output` 挂载后重跑成功。此链路不覆盖自动 PR 创建。
 
@@ -85,7 +99,7 @@ TURNYARD_DELEGATION_RECOVERY_E2E=1 TURNYARD_E2E_BACKEND=docker TURNYARD_E2E_IMAG
 
 ## 2026-09-27 源码与文档核对
 
-当前工作树通过 `go test ./...`、`go test -race ./...`、`go test -tags integration ./...`、`go vet ./...`、Staticcheck v0.8.1 和 `git diff --check`。集成测试未设置真实模型或 OCI 的启用变量，因此此处的 `-tags integration` 结果只证明编译及未跳过的测试通过，**不是新一轮真实代理验收**。`deadcode -test -tags integration ./...` 仅报告 Ent schema 中供代码生成器调用的方法；这类方法不是运行时死代码。本轮移除了只为测试查询首个检查点的存储 API，测试改用任务调用返回的检查点 ID；文档链接与本机历史证据路径均已核对。
+当时的工作树通过 `go test ./...`、`go test -race ./...`、`go test -tags integration ./...`、`go vet ./...`、Staticcheck v0.8.1 和 `git diff --check`。集成测试未设置真实模型或 OCI 的启用变量，因此此处的 `-tags integration` 结果只证明编译及未跳过的测试通过，**不是新一轮真实代理验收**。`deadcode -test -tags integration ./...` 仅报告 Ent schema 中供代码生成器调用的方法；这类方法不是运行时死代码。本轮移除了只为测试查询首个检查点的存储 API，测试改用任务调用返回的检查点 ID；文档链接与本机历史证据路径均已核对。
 
 单机进程冒烟测试使用临时状态目录和当前源码构建的 CLI：`daemon start`、`daemon status`、`daemon stop` 通过；停止后在线 `session show` 自动重新启动 supervisor，随后再次停止成功。该测试没有运行代理任务。
 
@@ -122,7 +136,7 @@ Podman 5.8.7 的官方容器镜像在独立 Linux/arm64 容器中以 VFS 存储�
 
 ## 2026-09-28 容量、OSS 与标准 cgroup 复验
 
-本轮加入单机任务并发与资源预算：默认最多两个活动任务，同一会话仍串行；允许受管委派的主任务预留子任务位置。Go 测试覆盖排队、释放、超限、超时与父子容量死锁，真实 Docker `model-only` 下的 OpenCode → Kimi 委派再次完成，父子候选均已验证，证据为 `.turnyard/delegation-go-20260928-093252-5ee3e4101804e8fc/evidence.json`。状态目录启动时及每十分钟计量，超过可配置阈值只告警，不提供硬配额或自动清理。GitHub CI 新增真实 Docker 边界作业；本机等价探针通过，远端 CI 结果以推送后实际记录为准。
+本轮加入单机任务并发与资源预算：默认最多两个活动任务，同一会话仍串行；允许受管委派的主任务预留子任务位置。Go 测试覆盖排队、释放、超限、超时与父子容量死锁，真实 Docker `model-only` 下的 OpenCode → Kimi 委派再次完成，父子候选均已验证，证据为 `.turnyard/delegation-go-20260928-093252-5ee3e4101804e8fc/evidence.json`。状态目录启动时及每十分钟计量，超过可配置阈值只告警，不提供硬配额或自动清理。GitHub CI 新增真实 Docker 边界作业；本机等价探针通过，随后公开 CI 的 Go 与 Docker 边界作业均通过，见本文开头的当前结论。
 
 在操作者提供的 OSS 测试桶专用前缀执行 `TestRealOSSConnector`：真实 OpenCode + Ollama Cloud 任务通过可信检查，宿主连接器上传文件并读回校验，独立 `aliyun ossutil cp` 再次读回，SHA-256 一致。证据在 `.turnyard/oss-go-20260928-091648-53b5a0ffd989c6aa/evidence.json`。清理该精确测试对象时服务端返回 `AccessDenied`，因此**整项 E2E 测试失败，不能算完整通过**；测试对象仍需有删除权限的账号清理；完整 URI 留在本机证据中。当前 RAM 用户也无 `ram:CreateUser` 权限，未创建 Turnyard 专用密钥。后续只给专用前缀的上传、读取、删除权限并重新运行完整测试；不要复用全桶或管理员密钥。
 
@@ -130,4 +144,4 @@ Podman 5.8.7 的官方容器镜像在独立 Linux/arm64 容器中以 VFS 存储�
 
 超时清理的第一次标准 cgroup 探针虽然返回通过，事后却发现 Docker 留下一个 `created` 容器。为此加入迟到容器检查，并在超时或取消后等待 CLI 退出、重复确认与删除。新检查最初复现了该泄漏；调整等待顺序后，`TestRealSandboxFaults` 再次通过，且随后 `docker ps -a` 无残留。先前的表面通过不计为清理验收。
 
-本轮当前工作树通过 `go test ./...`、`go test -race ./...`、`go vet ./...`、Staticcheck v0.8.1、Govulncheck v1.8.0 和 Ent 再生；容器镜像从固定的 Go 1.27.1、Node 26 基础摘要构建成功。`go test -tags integration -run '^$' ./test/...` 仅证明可编译，不计入真实代理、OSS 或 OCI 验收。
+该阶段工作树通过 `go test ./...`、`go test -race ./...`、`go vet ./...`、Staticcheck v0.8.1、Govulncheck v1.8.0 和 Ent 再生；容器镜像从固定的 Go 1.27.1、Node 26 基础摘要构建成功。`go test -tags integration -run '^$' ./test/...` 仅证明可编译，不计入真实代理、OSS 或 OCI 验收。

@@ -2,19 +2,28 @@
 
 [项目首页](../../README.md) · [English](../en/README.md)
 
-Turnyard 通过 `Session` 指定仓库和主代理，通过 `Environment` 指定沙箱、运行时、模型、工具及检查，再将每个 `Work` 任务追加到会话。三个输入都是 JSON，分别由 [session.json](../../internal/contracts/schemas/session.json)、[environment.json](../../internal/contracts/schemas/environment.json) 和 [work.json](../../internal/contracts/schemas/work.json) 校验。
+从[快速开始](../../README.md#快速开始)完成第一次运行后，可用本指南配置多仓库、工具、人工回复和恢复。Turnyard 使用三份 JSON：
+
+| 输入 | 定义内容 |
+| --- | --- |
+| [Session](../../internal/contracts/schemas/session.json) | 一个需求会话、可选仓库及主代理 |
+| [Environment](../../internal/contracts/schemas/environment.json) | 沙箱、运行时、模型、工具、检查与连接器 |
+| [Work](../../internal/contracts/schemas/work.json) | 追加到会话的一次任务、验收要求与交付物 |
+
+创建 Session 后可依次追加 Work；每个任务完成或处理失败后，再推进下一个。主代理的原生会话在这些任务之间续接。
 
 ## 构建与环境
 
 ```sh
 go build -o bin/turnyard ./cmd/turnyard
-container system start --enable-kernel-install
-container build -f Containerfile -t turnyard-agent:dev .
+docker build -f Containerfile -t turnyard-agent:dev .
 export OLLAMA_API_KEY='你的 API key'
 bin/turnyard doctor
 ```
 
-也可在 `Environment.sandbox.backend` 中选择 `docker`。Docker 需要先构建或导入同名镜像。对需要限制代理出站访问的任务，设置 `Environment.sandbox.network` 为 `model-only`；该模式目前仅支持 Docker，详情见[能力边界](delegation.md)。Podman 已在嵌套 Linux 的 rootful 环境跑通真实单任务链路，原生 rootless 与 macOS 虚拟机仍待验证。验收测试和 MCP 示例均使用 Go；代理镜像保留 Python 作为可选的通用开发工具。
+示例使用 Docker。若改用 Apple `container`，先运行 `container system start --enable-kernel-install`，再用 `container build -f Containerfile -t turnyard-agent:dev .` 构建镜像，并在 `Environment.sandbox.backend` 中选择 `apple-container`。Podman 的实际验证范围见[验证记录](validation.md)。
+
+对需要限制代理出站访问的任务，设置 `Environment.sandbox.network` 为 `model-only`；该模式目前仅支持 Docker，详情见[能力边界](delegation.md)。验收测试和 MCP 示例均使用 Go；代理镜像保留 Python 作为可选的通用开发工具。
 
 在 Linux 上建议以专用非 root 账户运行 Turnyard，并让该账户可访问所选容器运行时。Docker/Podman 代理容器使用 Turnyard 账户的 UID/GID，以读写会话私有目录；不要让不受信任的用户访问容器运行时的管理接口。
 
@@ -30,7 +39,7 @@ Linux Docker 可在可信的 Environment 中设置 `"sandbox":{"backend":"docker
 
 如已有本机 Go 仓库，可用 [local-go 示例](local-go.md)根据当前 HEAD 生成三份有效 JSON，再修改目标、检查和交付物要求。
 
-## 会话与任务
+## 运行会话
 
 ```sh
 bin/turnyard session create --file session.json
@@ -39,18 +48,23 @@ bin/turnyard task run <task-id>
 bin/turnyard task wait <task-id>
 bin/turnyard task show <task-id>
 bin/turnyard session complete <session-id>
-bin/turnyard session publish <session-id>
-bin/turnyard session cancel <session-id> --reason "需求已撤销"
-bin/turnyard session events <session-id>
 ```
 
-上述在线会话与任务命令发现本机 supervisor 尚未运行时会自动启动它。需要显式管理进程时，可用 `bin/turnyard daemon start`、`bin/turnyard daemon status`、`bin/turnyard daemon stop`。`task run` 接受任务后即返回，supervisor 在后台继续执行；`task wait` 轮询至任务停止。有活动任务时 `daemon stop` 会拒绝关闭。目前没有另一个单次执行模式，也没有随机器重启自动拉起 supervisor 的内置服务管理器。
+需要发布远端 feature 分支时，先在环境中显式允许远端写入，然后在完成会话后执行 `session publish <session-id>`。取消需求用 `session cancel <session-id> --reason "需求已撤销"`；查询事件用 `session events <session-id>`。
+
+上述命令发现本机 supervisor 尚未运行时会自动启动它。需要显式管理进程时，可用 `bin/turnyard daemon start`、`bin/turnyard daemon status`、`bin/turnyard daemon stop`。`task run` 接受任务后即返回，supervisor 在后台继续执行；`task wait` 轮询至任务停止。有活动任务时 `daemon stop` 会拒绝关闭。Turnyard 尚无内置的开机自动重启服务管理器。
 
 `session create` 默认允许 10 分钟准备仓库，可用 `--timeout <秒>` 调整，最大为 7200 秒。超时后用相同 `idempotencyKey` 重试，先查询已有会话，再决定是否重新准备。
 
-任务需要人工决定时会进入 `needs_input`，用 `task reply <task-id> --text "决定"` 继续原任务。检查失败后可用 `task verify <task-id>` 针对同一候选代码重跑检查，或用 `task retry <task-id>` 发起新代理调用。`task reconcile <task-id>` 为失败任务保存现有工作区检查点；对 `unknown` 任务，操作员应先检查工作区、调用日志和外部工具副作用，该命令确认相关容器已经停止后，记录审计事件并将任务转为可重试的 `failed`。`checkpoint restore <checkpoint-id>` 要求工作区和代理状态目录都不存在，避免覆盖现有状态。
+## 人工介入与恢复
+
+任务需要人工决定时会进入 `needs_input`，用 `task reply <task-id> --text "决定"` 继续原任务。检查失败后可用 `task verify <task-id>` 针对同一候选代码重跑检查，或用 `task retry <task-id>` 发起新代理调用。
+
+`task reconcile <task-id>` 为失败任务保存现有工作区检查点。对 `unknown` 任务，应先检查工作区、调用日志和外部工具副作用；该命令确认相关容器已经停止后，记录审计事件并将任务转为可重试的 `failed`。`checkpoint restore <checkpoint-id>` 要求工作区和代理状态目录都不存在，避免覆盖现有状态。
 
 同一需求可依次追加任务；只有所有任务的候选版本均通过检查和交付物校验，才可执行 `session complete`。中途撤销需求时，可在没有活动调用的情况下用 `session cancel` 结束。终态不能再追加任务、调用代理、复验或恢复检查点。`session complete` 返回每个任务的候选摘要与交付物清单。详见[生命周期、交付与存储](lifecycle.md)。
+
+## 状态目录
 
 默认状态目录是 `~/.local/share/turnyard`，可通过 `TURNYARD_HOME` 或命令开头的 `--home <目录>` 调整。`daemon.log` 保存结构化运行日志；会话事件保存在 SQLite；每次代理与检查的原始输出记录在私有日志文件中。任务文本和 API key 不写入 `daemon.log`。状态目录包含任务和代理会话数据，应限制访问并备份。
 

@@ -2,56 +2,80 @@
 
 [中文](../../README.md) · [Architecture](architecture.md) · [Validation](validation.md) · [Lifecycle](lifecycle.md)
 
-Turnyard is a standalone task executor for coding agents. It accepts structured JSON work with file and image attachments, runs an agent in an isolated container, verifies outputs, and delivers them to task-selected locations. Code changes across multiple Git repositories become task-specific feature commits; documents and other files can also be delivered locally or through a configured object-storage connector without Git.
+Turnyard is a standalone task executor for coding agents. Describe the work, execution environment, checks, and required outputs in JSON. Turnyard runs an agent in a single-host sandbox, keeps a resumable session, checks a pinned candidate, and returns an inspectable delivery record.
 
-Turnyard owns controlled execution and structured results on one machine. A separate scheduler decides when to run work and which machine should receive it. The supervisor can stay running across sessions; each agent invocation uses a temporary compute container. The host can set task concurrency and resource budgets and inspect state-usage warnings.
+Coding work can span repositories and turns, pause for a human decision, and produce files or text as well as code. Turnyard groups those steps into a finite session. It executes work on one machine; a separate system decides when to run work and which machine receives it.
 
-Coding work may span repositories and several turns, including a pause for a human decision. Turnyard keeps one requirement in a finite session. After an agent reports completion, it checks a recorded code candidate and confirms declared deliverables. Once all tasks have been reviewed, the session is explicitly completed while its delivery record remains inspectable.
+## What it does
 
-The current drivers are OpenCode, Kimi Code, Claude Code, and Codex CLI. Runtime and model bindings are separate configuration fields. Apple `container`, Docker, and Podman are available behind a sandbox interface; see [validation](validation.md) for combinations actually exercised.
-On Linux, run Turnyard under a dedicated non-root account with access to the chosen container runtime. Docker and Podman agent containers use that account's UID/GID for the private session mounts; keep the container runtime's management interface inaccessible to untrusted users.
-On a Linux Docker host, a trusted Environment may set `"sandbox":{"backend":"docker","image":"turnyard-agent:dev","isolation":"gvisor","network":"model-only"}`. Register `runsc` with Docker using the [official gVisor guide](https://gvisor.dev/docs/user_guide/quick_start/docker/) first. Turnyard rejects session creation when the runtime is absent. Agent invocations, checks, and native-session inventory use `runsc`; the model gateway remains a trusted service container. A gVisor sandbox probe and an OpenCode cloud-model task passed in a Linux/arm64 Docker-in-Docker environment. Early nested tasks used `--ignore-cgroups`; a later normal-cgroup probe and complete task passed; see [validation](validation.md).
+| Capability | Current approach |
+| --- | --- |
+| Agents and models | OpenCode, Kimi Code, Claude Code, and Codex CLI; runtime and model binding are configured separately, subject to driver compatibility |
+| Sessions | Resume the same native agent session across tasks, accept human replies, restore checkpoints, and close the session explicitly |
+| Sandboxes | Apple `container`, Docker, and Podman backends; optional gVisor `runsc` with Linux Docker |
+| Outputs | Optional multiple Git repositories and task-specific feature commits; files, images, and text can also be delivered without Git |
+| Tools | Skills, native MCP servers, executable tools, and managed delegation behind a searchable MCP gateway |
+| Records | Candidate versions, checks, required outputs, state events, and invocation logs |
 
-## Build and run
+Sandbox security differs by backend. Docker `model-only` can block direct agent egress and keep model and tool credentials in separate gateways. Read the [architecture](architecture.md) and [validation matrix](validation.md) for exact boundaries. `verified` means the configured checks and required-output validation passed; it does not replace human review of the requirement.
 
-Requires Go 1.27.1, an OCI sandbox backend, and an API key for the chosen model provider; repository work also needs Git. Apple `container` and Docker have completed real workflow validation. For Apple `container`:
+## Quick start
+
+This example uses Docker, OpenCode, and Ollama Cloud with an **existing, clean Go Git repository**. You need Go 1.27.1, Docker, Git, and a model API key. From the Turnyard repository root:
 
 ```sh
 go build -o bin/turnyard ./cmd/turnyard
-container system start --enable-kernel-install
-container build -f Containerfile -t turnyard-agent:dev .
+docker build -f Containerfile -t turnyard-agent:dev .
 export OLLAMA_API_KEY='your API key'
 bin/turnyard doctor
-TURNYARD_E2E=1 go test -tags integration -run TestMultiRepoWorkflow -v -count=1 -timeout 25m ./test/e2e
 ```
 
-The Go acceptance test creates independent Git repositories and exercises consecutive tasks, human input, and checkpoint restoration. It does not write to GitHub. The agent image retains Python as an optional general development tool. For tasks that must restrict direct agent egress, set `Environment.sandbox.network` to `model-only`; this mode currently requires Docker. See the [capability boundary](delegation.md).
+Generate three editable JSON files outside the target repository. The output directory must not contain files with the same names:
 
-## Inputs and commands
+```sh
+go run ./examples/local-go \
+  --repo /absolute/path/to/your/go-repo \
+  --out /tmp/turnyard-first-task \
+  --objective 'Add a health check and tests to the service' \
+  --commit-message 'feat: add health check'
+```
+
+Review the generated model binding, check command, and expected outputs. To require a specific file, add `--deliverable` to the generator or edit `work.json`. Assign the returned `sessionId` and `taskId` to the variables below:
+
+```sh
+bin/turnyard session create --file /tmp/turnyard-first-task/session.json
+SESSION_ID='paste the returned sessionId'
+bin/turnyard task add "$SESSION_ID" --file /tmp/turnyard-first-task/work.json
+TASK_ID='paste the returned taskId'
+bin/turnyard task run "$TASK_ID"
+bin/turnyard task wait "$TASK_ID"
+bin/turnyard task show "$TASK_ID"
+bin/turnyard session complete "$SESSION_ID"
+```
+
+`task run` returns after scheduling; the resident supervisor continues in the background. You can append more work before completing the session. Git changes stay on local task feature branches by default. Remote publication is explicit and happens after completion. Turnyard does not manage PR creation or branch merging.
+
+## Configure the inputs
 
 [Session](../../internal/contracts/schemas/session.json) names optional pinned repositories and a creation `idempotencyKey`. [Environment](../../internal/contracts/schemas/environment.json) defines the sandbox, agents, model bindings, skills, native MCP servers or executable tools, checks, attachment host allowlists, and trusted byte-transfer connectors. Agents discover selected tools through one MCP gateway. [Work](../../internal/contracts/schemas/work.json) defines the objective, optional repository scope, acceptance criteria, checks, file inputs, and required outputs. Git work may specify a human-readable `commitMessage`; documents can run without a repository. Files and images may be handed off locally or through a configured connector. See [tool injection](tools.md) and [lifecycle and delivery](lifecycle.md) for the full contracts.
 
-For an existing Go repository on this machine, the [local-go generator](local-go.md) writes three valid, editable JSON inputs from its current HEAD.
+The [local-go generator](local-go.md) pins the repository's current HEAD. For additional repositories, attachments, or non-Git output, edit the JSON contracts directly.
 
-```sh
-bin/turnyard session create --file session.json
-bin/turnyard task add <session-id> --file work.json
-bin/turnyard task run <task-id>
-bin/turnyard task wait <task-id>
-bin/turnyard task show <task-id>
-bin/turnyard session complete <session-id>
-bin/turnyard session publish <session-id>
-bin/turnyard session cancel <session-id> --reason "requirement withdrawn"
-bin/turnyard session events <session-id>
-```
+## Run and close a session
 
-The online session and task commands above start the local supervisor automatically if it is absent. Use `bin/turnyard daemon start`, `bin/turnyard daemon status`, and `bin/turnyard daemon stop` for explicit process control. `task run` accepts work and returns while the supervisor continues it; `task wait` polls until the task stops. `daemon stop` refuses to stop during active work. There is no separate one-shot execution mode or built-in service manager that restarts the supervisor after a machine reboot.
+Use `session publish <session-id>` for explicitly enabled remote Git writes, `session cancel <session-id> --reason "..."` to end an abandoned requirement, and `session events <session-id>` to inspect its state history.
+
+The session and task commands start the local supervisor automatically if it is absent. Use `bin/turnyard daemon start`, `bin/turnyard daemon status`, and `bin/turnyard daemon stop` for explicit process control. `daemon stop` refuses to stop during active work. Turnyard does not include a service manager to restart the supervisor after a machine reboot.
 
 `session create` allows 10 minutes for repository preparation by default. Set `--timeout <seconds>` to change it, up to 7200 seconds. After a timeout, retry with the same `idempotencyKey` so Turnyard checks for an existing session first.
+
+## Human input and recovery
 
 Use `task reply <task-id> --text "decision"` when a task is `needs_input`. `task verify <task-id>` reruns checks on the same failed candidate; `task retry <task-id>` starts another agent invocation. `task reconcile <task-id>` checkpoints a failed task. For an `unknown` task, the operator should first inspect the workspace, invocation logs, and external tool effects; reconcile confirms the containers have stopped, records an audit event, and makes the task retryable as `failed`. `checkpoint restore <checkpoint-id>` requires the workspace and native state directories to be absent so it cannot overwrite them.
 
 Append tasks to a session for the same requirement. `session complete` succeeds only after every task has a verified candidate and returns a candidate and deliverable manifest. An abandoned requirement can be ended with `session cancel` while no call is active. Terminal sessions cannot execute or restore work. See [lifecycle, delivery, and storage](lifecycle.md).
+
+## State and result records
 
 State defaults to `~/.local/share/turnyard`; set `TURNYARD_HOME` or prefix a command with `--home <directory>`. The SQLite event log and `daemon.log` provide operational traceability; private invocation logs contain agent and check output. `daemon.log` records identifiers and outcomes, not task text or API keys. Protect and back up the state directory.
 
