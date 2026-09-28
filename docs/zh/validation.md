@@ -81,7 +81,7 @@ TURNYARD_DELEGATION_RECOVERY_E2E=1 TURNYARD_E2E_BACKEND=docker TURNYARD_E2E_IMAG
 
 随后发现 Turnyard 曾把内部任务 ID 硬编码为 Git 提交标题。Codex 在 PR 分支上对 11 个提交做了**仅修改消息的历史整理**：逐项保留原文件树与顺序，当前 PR HEAD 为 `9c68e92764d7729f5372212ee1ac904ae907dff0`，原 HEAD `040062f10f7130dcbbb7192d28357750bde14a5d` 保存在私有备份分支 `archive/turnyard-auth-before-commit-titles`，本机映射记录为 `.turnyard/auth-validation-20260926/history-rewrite-map.json`。新 HEAD 的 GitHub Actions [push 检查](https://github.com/rwasayc/turnyard-auth/actions/runs/36253151118)和[PR 检查](https://github.com/rwasayc/turnyard-auth/actions/runs/36253153703)均通过。上面的 Turnyard 候选 SHA 与调用日志均指向**原始历史**；新 SHA 是 Codex 的历史整理结果，不应算作新的 Turnyard 验证。Turnyard 此后的任务输入可提供 `commitMessage`，任务 ID 改放在提交正文。
 
-在这一阶段尚未证明：Podman 真实链路、Kimi 的 DeepSeek/OpenAI 组合，以及不受信任务在宽泛出站网络下的安全性。Turnyard 的单机会话不支持跨机器或跨运行时迁移；任务分配、跨机器迁移和 PR 合并由外部系统负责。Ent 当前在打开数据库时执行追加式自动建表/迁移；后续对正式数据库结构做破坏性升级前，需要引入可审查的版本化迁移。聊天室验收只验证加入用户名后的消息路由，不证明身份认证或生产级私聊保密性。镜像与依赖为固定的已验证版本，固定版本不表示永远最新。
+在这一阶段尚未证明：Podman 真实链路、Kimi 的 DeepSeek/OpenAI 组合，以及不受信任务在宽泛出站网络下的安全性。Turnyard 的单机会话不支持跨机器或跨运行时迁移；任务分配、跨机器迁移和 PR 合并由外部系统负责。此阶段 Ent 在打开数据库时执行追加式自动建表；后续已改为编号 SQL 迁移，见[状态升级与保留](state-evolution.md)。聊天室验收只验证加入用户名后的消息路由，不证明身份认证或生产级私聊保密性。镜像与依赖为固定的已验证版本，固定版本不表示永远最新。
 
 统一产出清单的新增 Go 测试覆盖：旧文件格式兼容、短文本与 PNG 进入会话完成清单、缺少 PR 读回时阻止完成、错误 PR head 被拒绝、冻结的声明在复验时继续使用。使用已授权的 `gh` 对私有 `rwasayc/turnyard-auth` PR #1 做了只读真实读回，确认 URL、base、head 与状态。Docker + OpenCode + Ollama Cloud `glm-5.3-flash` 的新增真实链路也通过：任务同时产出 Git 文件与短文本，两项均为 `present`，会话完成清单包含它们；证据在 `.turnyard/output-go-20260927-012758-ba13e14807908942/evidence.json`。首次尝试将声明写入 `/state` 时被 OpenCode 的目录权限拒绝，任务按 `DELIVERABLE_MISSING` 失败；改用与 Git 仓库隔离的专用 `/workspace/.turnyard-output` 挂载后重跑成功。此链路不覆盖自动 PR 创建。
 
@@ -145,3 +145,9 @@ Podman 5.8.7 的官方容器镜像在独立 Linux/arm64 容器中以 VFS 存储�
 超时清理的第一次标准 cgroup 探针虽然返回通过，事后却发现 Docker 留下一个 `created` 容器。为此加入迟到容器检查，并在超时或取消后等待 CLI 退出、重复确认与删除。新检查最初复现了该泄漏；调整等待顺序后，`TestRealSandboxFaults` 再次通过，且随后 `docker ps -a` 无残留。先前的表面通过不计为清理验收。
 
 该阶段工作树通过 `go test ./...`、`go test -race ./...`、`go vet ./...`、Staticcheck v0.8.1、Govulncheck v1.8.0 和 Ent 再生；容器镜像从固定的 Go 1.27.1、Node 26 基础摘要构建成功。`go test -tags integration -run '^$' ./test/...` 仅证明可编译，不计入真实代理、OSS 或 OCI 验收。
+
+## 2026-09-28 准备阶段与数据库迁移
+
+附件暂存失败或任务入库被拒后立即清理该批次；supervisor 重启时读取已入库任务的附件引用，仅清除无人引用的摘要目录。针对性测试覆盖部分附件失败、任务拒绝、启动后保留已提交批次并删除崩溃遗留批次。仓库准备和附件接收有独立并发与等待上限，测试覆盖等待、队列拒绝和名额释放。`task add` 的默认请求时限已扩至 20 分钟，使准备阶段排队和附件下载能落在同一请求时限内。
+
+SQLite 从 Ent 自动建表改为编号 SQL 迁移。测试覆盖新库基线、无版本旧库备份和基准记录导入、重复打开、修改或过新的版本拒绝、失败事务回滚，以及 Ent 结构与 SQL 基线一致。另将此前双仓库运行的真实无版本库用 SQLite `.backup` 复制到被忽略的 `.turnyard/migration-verification-20260928/`，仅升级副本：升级前后均为 1 个会话、4 个任务、5 个候选和 10 个检查点，版本记为 1，`integrity_check` 返回 `ok`，`foreign_key_check` 无记录；重复打开没有新建第二份迁移备份。此处仍是本地存储验证；本次修改后的真实云代理、不同沙箱和大型历史数据库尚未重跑。

@@ -43,6 +43,22 @@ func (s *Service) createSession(ctx context.Context, session contracts.SessionSp
 		}
 		return sessionCreationResult(prior), nil
 	}
+	releasePreparation, err := s.Capacity.ReservePreparation(ctx)
+	if err != nil {
+		return SessionCreationResult{}, err
+	}
+	defer releasePreparation()
+	// Another request may have created this key while we waited for the slot.
+	prior, found, err = s.Store.SessionByCreationKey(ctx, session.IdempotencyKey)
+	if err != nil {
+		return SessionCreationResult{}, err
+	}
+	if found {
+		if prior.Digest != creationDigest {
+			return SessionCreationResult{}, fault.New(fault.CodeIdempotencyConflict, "session idempotency key already names different input")
+		}
+		return sessionCreationResult(prior), nil
+	}
 	for _, agent := range env.Agents {
 		_, binding, err := agents.SelectAgent(env, agent.ID)
 		if err != nil {
@@ -152,6 +168,16 @@ func (s *Service) AddTask(ctx context.Context, sid, path string) (TaskAdditionRe
 
 func (s *Service) addTask(ctx context.Context, sid string, work contracts.WorkSpec, sourcePath string) (TaskAdditionResult, error) {
 	ctx = observe.WithIDs(ctx, observe.IDs{SessionID: sid})
+	releasePreparation, err := s.Capacity.ReservePreparation(ctx)
+	if err != nil {
+		return TaskAdditionResult{}, err
+	}
+	defer releasePreparation()
+	unlock, err := s.lockAddition(ctx, sid)
+	if err != nil {
+		return TaskAdditionResult{}, err
+	}
+	defer unlock()
 	row, err := s.Store.Session(ctx, sid)
 	if err != nil {
 		return TaskAdditionResult{}, err
@@ -178,6 +204,7 @@ func (s *Service) addTask(ctx context.Context, sid string, work contracts.WorkSp
 		return TaskAdditionResult{TaskID: existing.ID, Status: existing.Status, Replayed: true}, nil
 	}
 	work.RequestDigest = requestDigest
+	stageRoot := inputs.BatchPath(filepath.Dir(row.Workspace), work)
 	work, err = inputs.Stage(ctx, work, sourcePath, filepath.Dir(row.Workspace), env)
 	if err != nil {
 		return TaskAdditionResult{}, err
@@ -185,6 +212,9 @@ func (s *Service) addTask(ctx context.Context, sid string, work contracts.WorkSp
 	fingerprint := contracts.Digest(work)
 	created, err := s.Store.AddTask(ctx, store.AddTaskInput{SessionID: sid, Key: work.IdempotencyKey, SpecJSON: contracts.JSONText(work), Digest: fingerprint})
 	if err != nil {
+		if cleanupErr := os.RemoveAll(stageRoot); cleanupErr != nil {
+			return TaskAdditionResult{}, fault.Wrap(fault.CodeInternalError, "remove rejected task inputs", errors.Join(err, cleanupErr), "task input cleanup failed")
+		}
 		return TaskAdditionResult{}, err
 	}
 	observe.Log.InfoContext(ctx, "task added", "sessionId", sid, "taskId", created.ID, "replayed", created.Replayed)

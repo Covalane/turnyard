@@ -5,12 +5,14 @@ import (
 	"encoding/json"
 	"os"
 	"path/filepath"
+	"sync"
 	"testing"
 	"time"
 
 	"github.com/Covalane/turnyard/internal/contracts"
 	"github.com/Covalane/turnyard/internal/fault"
 	"github.com/Covalane/turnyard/internal/gitstate"
+	"github.com/Covalane/turnyard/internal/inputs"
 
 	git "github.com/go-git/go-git/v5"
 	"github.com/go-git/go-git/v5/plumbing"
@@ -191,6 +193,91 @@ func TestConcurrentSessionCreationUsesOneKey(t *testing.T) {
 	entries, err := os.ReadDir(filepath.Join(f.service.Store.Root, "sessions"))
 	if err != nil || len(entries) != 2 { // fixture session plus one concurrent creation
 		t.Fatalf("orphaned workspace after replay: %v entries=%d", err, len(entries))
+	}
+}
+
+func TestSessionPreparationIsAdmittedBeforeRepositoryWork(t *testing.T) {
+	f := newFixture(t)
+	capacity, err := NewCapacity(CapacityLimits{MaxTasks: 2, MaxPreparations: 1, QueueWait: time.Second})
+	if err != nil {
+		t.Fatal(err)
+	}
+	f.service.Capacity = capacity
+	entered, unblock := make(chan struct{}), make(chan struct{})
+	var firstProbe sync.Once
+	f.service.BackendFactory = func(string) (SandboxBackend, error) {
+		firstProbe.Do(func() {
+			close(entered)
+			<-unblock
+		})
+		return f.sandbox, nil
+	}
+	path := filepath.Join(f.root, "inputs", "session.json")
+	var session SessionSpec
+	if err := ReadJSON(path, "session", &session); err != nil {
+		t.Fatal(err)
+	}
+	session.IdempotencyKey = "preparation-one"
+	firstPath := filepath.Join(f.root, "inputs", "preparation-one.json")
+	writeJSON(t, firstPath, session)
+	result := make(chan error, 1)
+	go func() {
+		_, err := f.service.CreateSession(context.Background(), firstPath)
+		result <- err
+	}()
+	select {
+	case <-entered:
+	case <-time.After(5 * time.Second):
+		t.Fatal("first preparation did not start")
+	}
+	session.IdempotencyKey = "preparation-two"
+	secondPath := filepath.Join(f.root, "inputs", "preparation-two.json")
+	writeJSON(t, secondPath, session)
+	secondResult := make(chan error, 1)
+	go func() {
+		_, err := f.service.CreateSession(context.Background(), secondPath)
+		secondResult <- err
+	}()
+	deadline := time.After(5 * time.Second)
+	for f.service.Capacity.Status().WaitingPreparations != 1 {
+		select {
+		case <-deadline:
+			t.Fatal("second session did not wait for preparation capacity")
+		default:
+			time.Sleep(time.Millisecond)
+		}
+	}
+	close(unblock)
+	if err := <-result; err != nil {
+		t.Fatal(err)
+	}
+	if err := <-secondResult; err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestRejectedTaskAdditionRemovesStagedInputs(t *testing.T) {
+	f := newFixture(t)
+	if _, err := f.service.AddTask(context.Background(), f.sid, f.task(t, "busy")); err != nil {
+		t.Fatal(err)
+	}
+	attachment := filepath.Join(f.root, "attachment.txt")
+	if err := os.WriteFile(attachment, []byte("snapshot"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	work := WorkSpec{SchemaVersion: "turnyard.work/v1", IdempotencyKey: "rejected", Objective: "Use attachment",
+		Acceptance: []string{"read attachment"}, Checks: []string{"cross"},
+		Inputs: []contracts.InputSpec{{ID: "note", Source: contracts.InputSource{Kind: contracts.InputFile, Path: attachment}}}}
+	work.Scope.Repositories = []ScopeRepo{{ID: "api", Mode: "read"}, {ID: "web", Mode: "read"}}
+	path := filepath.Join(f.root, "inputs", "rejected.json")
+	writeJSON(t, path, work)
+	work.RequestDigest = contracts.Digest(work)
+	root := inputs.BatchPath(filepath.Join(f.service.Store.Root, "sessions", f.sid), work)
+	if _, err := f.service.AddTask(context.Background(), f.sid, path); fault.CodeOf(err) != fault.CodeSessionBusy {
+		t.Fatalf("task was not rejected as busy: %v", err)
+	}
+	if _, err := os.Stat(root); !os.IsNotExist(err) {
+		t.Fatalf("rejected input snapshot remained: %v", err)
 	}
 }
 

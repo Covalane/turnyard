@@ -279,7 +279,14 @@ func runCLI(ctx context.Context, args []string) (map[string]any, error) {
 			if err != nil {
 				return nil, err
 			}
-			return ClientRequest(ctx, home, Request{Action: actionTaskAdd, SessionID: sid, File: path}, true)
+			timeout := 0
+			if value, ok := optional(args[3:], "--timeout"); ok {
+				timeout, err = strconv.Atoi(value)
+				if err != nil {
+					return nil, fault.Wrap(fault.CodeInvalidRequest, "parse task addition timeout", err, "invalid --timeout")
+				}
+			}
+			return ClientRequest(ctx, home, Request{Action: actionTaskAdd, SessionID: sid, File: path, Timeout: timeout}, true)
 		case "run", "retry", "reply":
 			id, err := positional(args, 2)
 			if err != nil {

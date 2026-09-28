@@ -28,6 +28,52 @@ type Service struct {
 	activeChildTasks  map[string]bool
 	runMu             sync.Mutex
 	runningSessions   map[string]bool
+	additionMu        sync.Mutex
+	additionLocks     map[string]*additionLock
+}
+
+type additionLock struct {
+	slot  chan struct{}
+	users int
+}
+
+// lockAddition serializes attachment promotion and database admission for one
+// session, so an unsuccessful retry cannot remove another request's snapshot.
+func (s *Service) lockAddition(ctx context.Context, sessionID string) (func(), error) {
+	s.additionMu.Lock()
+	if s.additionLocks == nil {
+		s.additionLocks = make(map[string]*additionLock)
+	}
+	lock := s.additionLocks[sessionID]
+	if lock == nil {
+		lock = &additionLock{slot: make(chan struct{}, 1)}
+		s.additionLocks[sessionID] = lock
+	}
+	lock.users++
+	s.additionMu.Unlock()
+	releaseReference := func() {
+		s.additionMu.Lock()
+		lock.users--
+		if lock.users == 0 {
+			delete(s.additionLocks, sessionID)
+		}
+		s.additionMu.Unlock()
+	}
+	select {
+	case lock.slot <- struct{}{}:
+		if err := ctx.Err(); err != nil {
+			<-lock.slot
+			releaseReference()
+			return nil, err
+		}
+		return func() {
+			<-lock.slot
+			releaseReference()
+		}, nil
+	case <-ctx.Done():
+		releaseReference()
+		return nil, ctx.Err()
+	}
 }
 
 func (s *Service) ActiveDelegations() int64 { return s.activeDelegations.Load() }

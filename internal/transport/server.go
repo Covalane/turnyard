@@ -16,6 +16,7 @@ import (
 	"github.com/Covalane/turnyard/internal/contracts"
 	"github.com/Covalane/turnyard/internal/engine"
 	"github.com/Covalane/turnyard/internal/fault"
+	"github.com/Covalane/turnyard/internal/inputs"
 	"github.com/Covalane/turnyard/internal/lifecycle"
 	"github.com/Covalane/turnyard/internal/observe"
 	"github.com/Covalane/turnyard/internal/stateops"
@@ -53,6 +54,7 @@ type Supervisor struct {
 	Service        *engine.Service
 	mu             sync.Mutex
 	active         map[string]bool
+	requests       int
 	listener       net.Listener
 	stopping       atomic.Bool
 	stateBytes     atomic.Int64
@@ -76,6 +78,17 @@ func NewSupervisor(ctx context.Context, home string) (*Supervisor, error) {
 	recovered, err := service.Store.RecoverInterrupted(ctx)
 	if err != nil {
 		return nil, errors.Join(err, fault.At(service.Close(), "close failed supervisor initialization"))
+	}
+	referenced, err := service.Store.ReferencedInputBatches(ctx)
+	if err != nil {
+		return nil, errors.Join(err, fault.At(service.Close(), "close failed supervisor initialization"))
+	}
+	pruned, err := inputs.PruneOrphaned(ctx, service.Store.Root, referenced)
+	if err != nil {
+		return nil, errors.Join(err, fault.At(service.Close(), "close failed supervisor initialization"))
+	}
+	if pruned > 0 {
+		observe.Log.InfoContext(ctx, "orphaned input batches removed", "count", pruned)
 	}
 	if len(recovered) > 0 {
 		observe.Log.WarnContext(ctx, "interrupted invocations marked unknown", "count", len(recovered), "taskIds", recovered)
@@ -177,6 +190,18 @@ func (s *Supervisor) scheduleVerify(ctx context.Context, tid string) (map[string
 	return map[string]any{"taskId": tid, "accepted": true, "operation": scheduledOperationVerify}, nil
 }
 func (s *Supervisor) Dispatch(ctx context.Context, req Request) (any, error) {
+	s.mu.Lock()
+	if s.stopping.Load() {
+		s.mu.Unlock()
+		return nil, fault.New(fault.CodeDaemonUnavailable, "supervisor is stopping")
+	}
+	s.requests++
+	s.mu.Unlock()
+	defer func() {
+		s.mu.Lock()
+		s.requests--
+		s.mu.Unlock()
+	}()
 	switch req.Action {
 	case actionPing:
 		return map[string]any{"ok": true, "pid": os.Getpid(), "capacity": s.Service.Capacity.Status(),
@@ -251,12 +276,15 @@ func (s *Supervisor) Dispatch(ctx context.Context, req Request) (any, error) {
 		return s.Service.Restore(ctx, req.CheckpointID)
 	case actionDaemonStop:
 		s.mu.Lock()
-		busy := len(s.active) > 0 || s.Service.ActiveDelegations() > 0
+		preparations := s.Service.Capacity.Status()
+		busy := s.requests > 1 || len(s.active) > 0 || s.Service.ActiveDelegations() > 0 || preparations.ActivePreparations > 0 || preparations.WaitingPreparations > 0
+		if !busy {
+			s.stopping.Store(true)
+		}
 		s.mu.Unlock()
 		if busy {
 			return nil, fault.New(fault.CodeSessionBusy, "active work must finish before shutdown")
 		}
-		s.stopping.Store(true)
 		go func() {
 			time.Sleep(100 * time.Millisecond)
 			if err := s.listener.Close(); err != nil && !errors.Is(err, net.ErrClosed) {

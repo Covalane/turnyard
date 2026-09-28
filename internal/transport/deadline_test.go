@@ -25,3 +25,15 @@ func TestSessionCreationTimeout(t *testing.T) {
 		t.Fatalf("wire timeout %v", got)
 	}
 }
+
+func TestTaskAdditionTimeoutCoversPreparationQueue(t *testing.T) {
+	if got, err := workTimeout(Request{Action: actionTaskAdd}); err != nil || got != defaultTaskAddTimeout {
+		t.Fatalf("default task addition timeout: %v %v", got, err)
+	}
+	if got, err := workTimeout(Request{Action: actionTaskAdd, Timeout: 45}); err != nil || got != 45*time.Second {
+		t.Fatalf("custom task addition timeout: %v %v", got, err)
+	}
+	if _, err := workTimeout(Request{Action: actionTaskAdd, Timeout: 7201}); err == nil {
+		t.Fatal("accepted an excessive task addition timeout")
+	}
+}

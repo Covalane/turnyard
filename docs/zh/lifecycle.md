@@ -43,7 +43,7 @@ bin/turnyard session prune <已完成或取消的会话ID> --backup /secure/back
 | `https` | `url` | 只下载 `Environment.inputHosts` 允许的域名；必须提供预期 SHA-256，跳转也检查域名 |
 | `connector` | `connector`、`uri` | 用环境预先配置的连接器下载；URI 必须在允许的前缀内，必须提供预期 SHA-256 |
 
-Turnyard 在 `task add` 时复制并校验附件，保存为会话内的只读快照；后续源文件或 URL 变化不影响任务。原始 URL、签名查询参数和本机源路径不写入任务记录。单个附件目前上限为 256 MiB。代理在 `/workspace/.turnyard-input/<快照目录>/<id>` 读取文件；这保证容器内能访问字节，图片能否被模型当作视觉输入仍取决于所选运行时和模型。
+Turnyard 在 `task add` 时复制并校验附件，保存为会话内的只读快照；后续源文件或 URL 变化不影响任务。原始 URL、签名查询参数和本机源路径不写入任务记录。单个附件目前上限为 256 MiB；接收、排队和入库合计默认允许 20 分钟，可用 `task add --timeout <秒>` 调整。代理在 `/workspace/.turnyard-input/<快照目录>/<id>` 读取文件；这保证容器内能访问字节，图片能否被模型当作视觉输入仍取决于所选运行时和模型。
 
 `Work.deliverables` 声明必需产出，文件、图片、文本和 PR 共享 `id`、`kind`、`status`、`verification` 等结果字段：
 
@@ -92,14 +92,14 @@ Turnyard 在 `task add` 时复制并校验附件，保存为会话内的只读�
 
 ## 单机状态与 SQLite
 
-supervisor 默认最多同时执行两个任务；同一会话仍只能运行一个。超出的任务按到达顺序排队，默认最多等待 15 分钟；父任务正在等待的受管子任务可越过暂时无法准入的普通任务，以免发生容量死锁。等待超时返回 `CAPACITY_WAIT_TIMEOUT`，单个任务声明的资源超过主机预算返回 `CAPACITY_EXCEEDED`。允许委派的主任务会预留一个子任务位置，避免父任务占满全部位置后等待子任务。`daemon status` 返回活动数、排队数及已预留资源。宿主可在启动 supervisor 前设置 `TURNYARD_MAX_ACTIVE_TASKS`、`TURNYARD_MAX_ACTIVE_CPUS`、`TURNYARD_MAX_ACTIVE_MEMORY_MB` 和 `TURNYARD_QUEUE_WAIT_SECONDS`；CPU 和内存总预算设为 `0` 表示不启用该预算。这里按每个任务声明的沙箱限额做准入，不能代替容器运行时实际执行的限额。
+supervisor 默认最多同时执行两个任务；同一会话仍只能运行一个。超出的任务按到达顺序排队，默认最多等待 15 分钟；父任务正在等待的受管子任务可越过暂时无法准入的普通任务，以免发生容量死锁。等待超时返回 `CAPACITY_WAIT_TIMEOUT`，单个任务声明的资源超过主机预算返回 `CAPACITY_EXCEEDED`。允许委派的主任务会预留一个子任务位置，避免父任务占满全部位置后等待子任务。仓库准备与任务附件接收另有独立准入：默认同时最多两个准备请求、最多八个等待请求；队列满返回 `CAPACITY_EXCEEDED`。`daemon status` 返回任务和准备请求的活动数与等待数，以及已预留的任务资源。宿主可在启动 supervisor 前设置 `TURNYARD_MAX_ACTIVE_TASKS`、`TURNYARD_MAX_ACTIVE_PREPARATIONS`、`TURNYARD_MAX_PENDING_PREPARATIONS`、`TURNYARD_MAX_ACTIVE_CPUS`、`TURNYARD_MAX_ACTIVE_MEMORY_MB` 和 `TURNYARD_QUEUE_WAIT_SECONDS`；CPU 和内存总预算设为 `0` 表示不启用该预算。这里按每个任务声明的沙箱限额做准入，不能代替容器运行时实际执行的限额。
 
-supervisor 启动时及每十分钟扫描状态目录，`daemon status` 返回 `stateBytes`、`stateWarning`；默认超过 10 GiB 记录一次警告，`TURNYARD_STATE_WARN_MB` 可调整阈值，`0` 关闭警告。这是用量告警，不是硬磁盘配额；自动保留期限和版本化数据库迁移见[状态升级与保留方案](state-evolution.md)。
+supervisor 启动时清理未被已入库任务引用的附件暂存批次，并在启动时及每十分钟扫描状态目录。`daemon status` 返回 `stateBytes`、`stateWarning`；默认超过 10 GiB 记录一次警告，`TURNYARD_STATE_WARN_MB` 可调整阈值，`0` 关闭警告。这是用量告警，不是硬磁盘配额；结构迁移现状及自动保留期限见[状态升级与保留](state-evolution.md)。
 
 Turnyard 的执行边界是一台机器。数据库保存会话、状态转换、事件及产出清单，短文本产出也会直接存入候选结果；Git 仓库、检查点归档及原始日志存为文件。supervisor 持有状态目录的独占锁，一个进程可持续处理多个会话。SQLite 符合这一单机边界，无需另设数据库服务。会话结束后的记录保留期限由操作者决定，与 supervisor 是否常驻无关。
 
 上层调度系统可以在不同机器上分别运行 Turnyard 实例，并收集其标准化结果；各实例维护自己的状态目录。Turnyard 不负责在机器之间迁移正在执行的会话，也不允许多台机器通过网络文件系统共享同一个 SQLite 文件。
 
-Ent 支持多种数据库方言，但当前 `store.OpenStore`、备份恢复和旧数据迁移均依赖 SQLite 的具体行为；更换 DSN 不是本项目单机执行目标的必要步骤。正式使用前仍需为 SQLite 结构升级建立可审查的版本化迁移，并明确数据保留与备份策略。
+Ent 支持多种数据库方言，但当前 `store.OpenStore`、备份恢复和版本化迁移均依赖 SQLite 的具体行为；更换 DSN 不是本项目单机执行目标的必要步骤。结构升级以编号 SQL 和校验和审查；数据保留与备份策略仍由部署者明确制定。
 
 参考：[SQLite 适用场景](https://www.sqlite.org/whentouse.html) · [SQLite 与网络文件系统](https://www.sqlite.org/useovernet.html)

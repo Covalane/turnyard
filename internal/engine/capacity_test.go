@@ -58,6 +58,23 @@ func TestCapacityQueuesAndReleasesResources(t *testing.T) {
 	}
 }
 
+func TestAdditionLockWaitHonorsCancellation(t *testing.T) {
+	s := &Service{}
+	release, err := s.lockAddition(context.Background(), "ses_test")
+	if err != nil {
+		t.Fatal(err)
+	}
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+	if _, err := s.lockAddition(ctx, "ses_test"); err != context.Canceled {
+		t.Fatalf("cancelled addition waited: %v", err)
+	}
+	release()
+	if len(s.additionLocks) != 0 {
+		t.Fatalf("session addition lock leaked: %v", s.additionLocks)
+	}
+}
+
 func TestDelegatingTaskLeavesCapacityForChild(t *testing.T) {
 	c, err := NewCapacity(CapacityLimits{MaxTasks: 2, MaxCPUs: 2, MaxMemoryMB: 2048, QueueWait: time.Second})
 	if err != nil {
@@ -121,4 +138,51 @@ func TestCapacityRejectsOversizeAndTimesOut(t *testing.T) {
 	if got := c.Status(); got.ActiveTasks != 0 || got.WaitingTasks != 0 {
 		t.Fatalf("reservation leaked after timeout: %+v", got)
 	}
+}
+
+func TestPreparationAdmissionBoundsQueueAndReleases(t *testing.T) {
+	c, err := NewCapacity(CapacityLimits{MaxTasks: 2, MaxPreparations: 1, MaxPendingPreparations: 1, QueueWait: time.Second})
+	if err != nil {
+		t.Fatal(err)
+	}
+	release, err := c.ReservePreparation(context.Background())
+	if err != nil {
+		t.Fatal(err)
+	}
+	result := make(chan error, 1)
+	go func() {
+		release, err := c.ReservePreparation(context.Background())
+		if err == nil {
+			release()
+		}
+		result <- err
+	}()
+	deadline := time.After(time.Second)
+	for c.Status().WaitingPreparations != 1 {
+		select {
+		case <-deadline:
+			t.Fatal("second preparation did not wait")
+		default:
+			time.Sleep(time.Millisecond)
+		}
+	}
+	if _, err := c.ReservePreparation(context.Background()); fault.CodeOf(err) != fault.CodeCapacityExceeded {
+		t.Fatalf("third preparation exceeded the queue bound: %v", err)
+	}
+	if got := c.Status(); got.ActivePreparations != 1 || got.WaitingPreparations != 1 || got.MaxPreparations != 1 {
+		t.Fatalf("preparation status: %+v", got)
+	}
+	release()
+	release()
+	if err := <-result; err != nil {
+		t.Fatal(err)
+	}
+	if got := c.Status(); got.ActivePreparations != 0 {
+		t.Fatalf("preparation slot leaked: %+v", got)
+	}
+	release, err = c.ReservePreparation(context.Background())
+	if err != nil {
+		t.Fatalf("capacity not reusable: %v", err)
+	}
+	release()
 }

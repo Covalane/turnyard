@@ -13,24 +13,34 @@ import (
 // CapacityLimits bound work admitted by one supervisor. Zero resource budgets
 // disable that particular budget; MaxTasks and QueueWait must be positive.
 type CapacityLimits struct {
-	MaxTasks    int
-	MaxCPUs     int
-	MaxMemoryMB int
-	QueueWait   time.Duration
+	MaxTasks int
+	// MaxPreparations limits concurrent repository preparation and input staging.
+	// Zero uses MaxTasks for callers that construct CapacityLimits directly.
+	MaxPreparations int
+	// MaxPendingPreparations bounds goroutines waiting to prepare input state.
+	// Zero defaults to four times MaxPreparations.
+	MaxPendingPreparations int
+	MaxCPUs                int
+	MaxMemoryMB            int
+	QueueWait              time.Duration
 }
 
 func DefaultCapacityLimits() CapacityLimits {
-	return CapacityLimits{MaxTasks: 2, QueueWait: 15 * time.Minute}
+	return CapacityLimits{MaxTasks: 2, MaxPreparations: 2, MaxPendingPreparations: 8, QueueWait: 15 * time.Minute}
 }
 
 type CapacityStatus struct {
-	MaxTasks         int `json:"maxTasks"`
-	MaxCPUs          int `json:"maxCPUs"`
-	MaxMemoryMB      int `json:"maxMemoryMB"`
-	ActiveTasks      int `json:"activeTasks"`
-	ReservedCPUs     int `json:"reservedCPUs"`
-	ReservedMemoryMB int `json:"reservedMemoryMB"`
-	WaitingTasks     int `json:"waitingTasks"`
+	MaxTasks               int `json:"maxTasks"`
+	MaxCPUs                int `json:"maxCPUs"`
+	MaxMemoryMB            int `json:"maxMemoryMB"`
+	ActiveTasks            int `json:"activeTasks"`
+	ReservedCPUs           int `json:"reservedCPUs"`
+	ReservedMemoryMB       int `json:"reservedMemoryMB"`
+	WaitingTasks           int `json:"waitingTasks"`
+	MaxPreparations        int `json:"maxPreparations"`
+	MaxPendingPreparations int `json:"maxPendingPreparations"`
+	ActivePreparations     int `json:"activePreparations"`
+	WaitingPreparations    int `json:"waitingPreparations"`
 }
 
 type capacityWaiter struct {
@@ -49,28 +59,84 @@ const (
 )
 
 type Capacity struct {
-	mu      sync.Mutex
-	limits  CapacityLimits
-	active  int
-	cpus    int
-	memory  int
-	waiters []*capacityWaiter
-	parents map[*capacityWaiter]bool
+	mu                 sync.Mutex
+	limits             CapacityLimits
+	active             int
+	cpus               int
+	memory             int
+	waiters            []*capacityWaiter
+	parents            map[*capacityWaiter]bool
+	preparations       chan struct{}
+	preparationMu      sync.Mutex
+	preparationWaiters int
 }
 
 func NewCapacity(limits CapacityLimits) (*Capacity, error) {
-	if limits.MaxTasks < 1 || limits.MaxCPUs < 0 || limits.MaxMemoryMB < 0 || limits.QueueWait <= 0 {
+	if limits.MaxPreparations == 0 {
+		limits.MaxPreparations = limits.MaxTasks
+	}
+	if limits.MaxPendingPreparations == 0 {
+		limits.MaxPendingPreparations = limits.MaxPreparations * 4
+	}
+	if limits.MaxTasks < 1 || limits.MaxPreparations < 1 || limits.MaxPendingPreparations < 1 || limits.MaxCPUs < 0 || limits.MaxMemoryMB < 0 || limits.QueueWait <= 0 {
 		return nil, fault.New(fault.CodeInvalidSpec, "invalid supervisor capacity limits")
 	}
-	return &Capacity{limits: limits, parents: map[*capacityWaiter]bool{}}, nil
+	return &Capacity{limits: limits, parents: map[*capacityWaiter]bool{}, preparations: make(chan struct{}, limits.MaxPreparations)}, nil
 }
 
 func (c *Capacity) Status() CapacityStatus {
+	c.preparationMu.Lock()
+	waitingPreparations := c.preparationWaiters
+	c.preparationMu.Unlock()
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	return CapacityStatus{MaxTasks: c.limits.MaxTasks, MaxCPUs: c.limits.MaxCPUs,
 		MaxMemoryMB: c.limits.MaxMemoryMB, ActiveTasks: c.active, ReservedCPUs: c.cpus,
-		ReservedMemoryMB: c.memory, WaitingTasks: len(c.waiters)}
+		ReservedMemoryMB: c.memory, WaitingTasks: len(c.waiters),
+		MaxPreparations: c.limits.MaxPreparations, MaxPendingPreparations: c.limits.MaxPendingPreparations,
+		ActivePreparations:  len(c.preparations),
+		WaitingPreparations: waitingPreparations}
+}
+
+// ReservePreparation bounds concurrent clone and input transfers as well as
+// the number of requests waiting for a slot.
+func (c *Capacity) ReservePreparation(ctx context.Context) (func(), error) {
+	if err := ctx.Err(); err != nil {
+		return nil, err
+	}
+	grant := func() func() {
+		var once sync.Once
+		return func() { once.Do(func() { <-c.preparations }) }
+	}
+	select {
+	case c.preparations <- struct{}{}:
+		return grant(), nil
+	default:
+	}
+	c.preparationMu.Lock()
+	if c.preparationWaiters >= c.limits.MaxPendingPreparations {
+		c.preparationMu.Unlock()
+		return nil, fault.New(fault.CodeCapacityExceeded, "supervisor preparation queue is full")
+	}
+	c.preparationWaiters++
+	c.preparationMu.Unlock()
+	defer func() {
+		c.preparationMu.Lock()
+		c.preparationWaiters--
+		c.preparationMu.Unlock()
+	}()
+	waitCtx, cancel := context.WithTimeout(ctx, c.limits.QueueWait)
+	defer cancel()
+	select {
+	case c.preparations <- struct{}{}:
+		if err := waitCtx.Err(); err != nil {
+			<-c.preparations
+			return nil, fault.Wrap(fault.CodeCapacityWaitTimeout, "wait for preparation capacity", err, "preparation was not admitted")
+		}
+		return grant(), nil
+	case <-waitCtx.Done():
+		return nil, fault.Wrap(fault.CodeCapacityWaitTimeout, "wait for preparation capacity", waitCtx.Err(), "preparation was not admitted")
+	}
 }
 
 // Reserve uses FIFO admission. The timeout bounds queueing, while the caller's

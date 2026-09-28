@@ -45,30 +45,11 @@ func OpenStore(ctx context.Context, root string) (*Store, error) {
 	if _, err := db.ExecContext(ctx, "PRAGMA foreign_keys=ON; PRAGMA busy_timeout=30000; PRAGMA journal_mode=WAL"); err != nil {
 		return nil, errors.Join(err, db.Close())
 	}
+	if err := migrateSchema(ctx, db, filepath.Join(abs, DatabaseFileName)); err != nil {
+		return nil, errors.Join(err, db.Close())
+	}
 	client := ent.NewClient(ent.Driver(entsql.OpenDB(dialect.SQLite, db)))
-	if err := client.Schema.Create(ctx); err != nil {
-		return nil, errors.Join(err, client.Close())
-	}
-	if err := migrateTaskBases(ctx, db); err != nil {
-		return nil, errors.Join(err, client.Close())
-	}
 	return &Store{Root: abs, client: client}, nil
-}
-
-// migrateTaskBases imports the old composite-key table once. All normal reads
-// and writes use Ent; this path is kept solely for existing workspaces.
-func migrateTaskBases(ctx context.Context, db *sql.DB) error {
-	var oldTable string
-	err := db.QueryRowContext(ctx, "SELECT name FROM sqlite_master WHERE type='table' AND name='task_repositories'").Scan(&oldTable)
-	if err == sql.ErrNoRows {
-		return nil
-	}
-	if err != nil {
-		return err
-	}
-	_, err = db.ExecContext(ctx, `INSERT OR IGNORE INTO task_bases(id,task_id,repo_id,base_commit)
-        SELECT task_id || ':' || repo_id,task_id,repo_id,base_commit FROM task_repositories`)
-	return err
 }
 
 func (s *Store) Close() error { return s.client.Close() }

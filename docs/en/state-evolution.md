@@ -1,17 +1,16 @@
-# State migration and retention proposal
+# State migration and retention
 
 [Documentation index](../../README.md) · [中文](../zh/state-evolution.md)
 
-This is a proposal for later implementation. The existing CLI already provides offline backup, verification, restore, and backup-verified pruning of individual terminal sessions. Automatic retention and versioned database migrations are not implemented.
+Turnyard provides offline backup, verification, restore, and backup-verified pruning of individual terminal sessions. SQLite schema changes now use versioned migrations. Automatic retention and a hard disk quota remain future work.
 
 ## Database migration
 
-1. Baseline the current Ent schema with reviewed, versioned migration files, checksums, and fixtures from older databases. Stop applying unreviewed schema changes to production state on every `OpenStore`.
-2. At startup, accept only known database versions. Apply migrations in order, recording each version in the same SQLite transaction. Reject a database newer than the binary or missing a migration.
-3. Hold the exclusive state lock and create a verified full backup before upgrading. Preserve it on failure. Rollback restores the full backup into a new state directory rather than assuming reverse SQL can restore data.
-4. Version external JSON inputs separately from the internal database schema.
+`internal/store/migrations/001_baseline.sql` freezes the current Ent schema. `OpenStore` no longer calls Ent automatic schema creation. On startup, it checks the recorded database version and SQL checksums, then applies only bundled migrations in order. A fresh database receives the baseline. A known unversioned database is backed up with SQLite `VACUUM INTO` and checked for integrity before additive legacy columns and `task_repositories` bases are adopted and version 1 is recorded in a transaction. Unknown schemas, newer or modified migration versions, and failed checks stop startup. Future upgrades from a recorded version also back up first and apply SQL and version records transactionally.
 
-Acceptance: old database copies retain sessions, candidates, and checkpoints; reopening does not duplicate work; injected migration failure remains recoverable; an older binary rejects a newer database; a second supervisor cannot migrate concurrently.
+The supervisor holds the exclusive state lock before opening the database. A failed migration retains the original database and backup; rollback restores the full backup offline to a new directory, without relying on reverse SQL. Database versions are separate from external JSON `schemaVersion` values. Each later schema change needs a new numbered SQL file, an old-version fixture, and upgrade tests; published migration files must remain unchanged.
+
+Current tests cover fresh and unversioned databases, legacy repository bases, repeated opens, unknown or modified versions, failure rollback, and agreement between the Ent schema and migration baseline. Large real historical databases and a future version-2 upgrade still need separate release rehearsal.
 
 ## Retention and capacity
 

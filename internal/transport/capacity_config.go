@@ -18,6 +18,8 @@ func capacityFromEnvironment() (engine.CapacityLimits, error) {
 		target *int
 	}{
 		{"TURNYARD_MAX_ACTIVE_TASKS", &limits.MaxTasks},
+		{"TURNYARD_MAX_ACTIVE_PREPARATIONS", &limits.MaxPreparations},
+		{"TURNYARD_MAX_PENDING_PREPARATIONS", &limits.MaxPendingPreparations},
 		{"TURNYARD_MAX_ACTIVE_CPUS", &limits.MaxCPUs},
 		{"TURNYARD_MAX_ACTIVE_MEMORY_MB", &limits.MaxMemoryMB},
 	} {

@@ -79,7 +79,7 @@ bin/turnyard session complete "$SESSION_ID"
 | [错误与可观测性](docs/zh/observability.md) | [Errors and observability](docs/en/observability.md) |
 | [生命周期、交付与存储](docs/zh/lifecycle.md) | [Lifecycle, delivery, and storage](docs/en/lifecycle.md) |
 | [Git 工作流](docs/zh/git.md) | [Git workflow](docs/en/git.md) |
-| [状态升级与保留方案](docs/zh/state-evolution.md) | [State migration and retention proposal](docs/en/state-evolution.md) |
+| [状态升级与保留](docs/zh/state-evolution.md) | [State migration and retention](docs/en/state-evolution.md) |
 | [发布与复验](docs/zh/release.md) | [Release and validation](docs/en/release.md) |
 
 ## 开发与许可证
