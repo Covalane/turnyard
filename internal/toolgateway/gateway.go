@@ -19,6 +19,7 @@ import (
 	"time"
 	"unicode"
 
+	"github.com/Covalane/turnyard/internal/contracts"
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 	"github.com/santhosh-tekuri/jsonschema/v6"
 )
@@ -356,6 +357,11 @@ func (g *Gateway) checkCatalogLock(entries map[string]*catalogEntry) error {
 	}
 	ids := make([]string, 0, len(entries))
 	for id := range entries {
+		// Built-in request_input is owned by Turnyard. Keep the lock on the
+		// environment-granted catalog stable across this additive upgrade.
+		if id == contracts.HumanInputToolID+"/"+contracts.HumanInputToolName {
+			continue
+		}
 		ids = append(ids, id)
 	}
 	slices.Sort(ids)

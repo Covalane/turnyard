@@ -18,7 +18,7 @@ func AgentPrompt(work contracts.WorkSpec, scope []contracts.ScopeRepo, reply, re
 		"You are working inside Turnyard. Repositories are separate directories under /workspace.",
 		"Do not run git commit, switch branches, push, or read credentials. Only create PRs through an explicitly authorized tool when the task requires one; never use a direct shell or network call to create a PR.",
 		"Turnyard will inspect and commit repository changes. Write only in authorized repositories and the declared output directory.",
-		"Only if a human decision is required, put TURNYARD_NEEDS_INPUT: followed by a concise question on the final line of your response. Never mention this marker otherwise.",
+		"If a human decision is required to continue, call the Turnyard MCP gateway's call_tool with tool_id " + contracts.HumanInputToolID + "/" + contracts.HumanInputToolName + " and arguments containing a concise question. After the tool succeeds, finish this turn. Otherwise, do not request human input.",
 		"Repository permissions: " + strings.Join(allowed, ", ") + ".",
 		"Objective: " + work.Objective + ".",
 		"Acceptance: " + strings.Join(work.Acceptance, "; ") + ".",

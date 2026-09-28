@@ -1,12 +1,13 @@
 FROM golang:1.27.1-bookworm@sha256:69a7b9788769bec032d238959b61854e9ae87f57be9029ec04e9885fabf99195 AS go-toolchain
 WORKDIR /src
 COPY go.mod go.sum ./
+COPY internal/contracts ./internal/contracts
+COPY internal/fault ./internal/fault
+COPY internal/humaninput ./internal/humaninput
 COPY internal/toolgateway ./internal/toolgateway
 COPY cmd/turnyard-tool-gateway ./cmd/turnyard-tool-gateway
 RUN --mount=type=cache,target=/go/pkg/mod --mount=type=cache,target=/root/.cache/go-build CGO_ENABLED=0 go build -o /turnyard-tool-gateway ./cmd/turnyard-tool-gateway
 COPY cmd/turnyard-tool-bridge ./cmd/turnyard-tool-bridge
-COPY internal/contracts ./internal/contracts
-COPY internal/fault ./internal/fault
 RUN --mount=type=cache,target=/go/pkg/mod --mount=type=cache,target=/root/.cache/go-build CGO_ENABLED=0 go build -o /turnyard-tool-bridge ./cmd/turnyard-tool-bridge
 FROM node:26-bookworm-slim@sha256:662933cf47f013bc8e4beb31a6116448427a82057ba7c42c97e4c5ba766504c2
 COPY --from=go-toolchain /usr/local/go /usr/local/go

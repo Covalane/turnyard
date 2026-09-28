@@ -11,6 +11,7 @@ import (
 	"github.com/Covalane/turnyard/internal/contracts"
 	"github.com/Covalane/turnyard/internal/fault"
 	"github.com/Covalane/turnyard/internal/gitstate"
+	"github.com/Covalane/turnyard/internal/humaninput"
 	"github.com/Covalane/turnyard/internal/lifecycle"
 	"github.com/Covalane/turnyard/internal/observe"
 	"github.com/Covalane/turnyard/internal/sandbox"
@@ -123,6 +124,13 @@ func (s *Service) invokeAgent(ctx context.Context, input turnExecution, agentAtt
 	})
 	if err != nil {
 		return agents.AgentResult{}, err
+	}
+	question, err := humaninput.Read(artifactOutputDir(input))
+	if err != nil {
+		return agents.AgentResult{}, err
+	}
+	if question != "" {
+		result.NeedsInput = question
 	}
 	err = s.Store.CompleteAgent(ctx, input.task.SessionID, input.task.ID, input.invocationID, result.NativeID,
 		map[string]any{"native_id": result.NativeID, "event_count": len(result.Events), "needs_input": result.NeedsInput,

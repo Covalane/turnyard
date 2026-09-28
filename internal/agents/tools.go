@@ -1,6 +1,8 @@
 package agents
 
 import (
+	"bytes"
+	"errors"
 	"os"
 	"path/filepath"
 	"strings"
@@ -49,7 +51,7 @@ func ValidateTools(agent contracts.AgentSpec, env contracts.EnvironmentSpec) err
 }
 
 func PrepareTools(agent contracts.AgentSpec, env contracts.EnvironmentSpec, state string) ([]ToolLaunch, error) {
-	backends := make([]toolgateway.Backend, 0, len(agent.Tools)+1)
+	backends := make([]toolgateway.Backend, 0, len(agent.Tools)+2)
 	for _, id := range agent.Tools {
 		tool, err := selectedTool(env, id)
 		if err != nil {
@@ -92,9 +94,7 @@ func PrepareTools(agent contracts.AgentSpec, env contracts.EnvironmentSpec, stat
 	if len(agent.Delegates) > 0 {
 		backends = append(backends, toolgateway.Backend{ID: DelegationToolID, Argv: []string{executableBridge, "--delegate"}, PassEnv: []string{"TURNYARD_DELEGATION_INVOCATION"}})
 	}
-	if len(backends) == 0 {
-		return nil, nil
-	}
+	backends = append(backends, toolgateway.Backend{ID: contracts.HumanInputToolID, Argv: []string{executableBridge, "--human-input"}})
 	root := filepath.Join(state, "tool-gateway")
 	if err := EnsureStateDirectory(state, root); err != nil {
 		return nil, err
@@ -111,7 +111,7 @@ func PrepareTools(agent contracts.AgentSpec, env contracts.EnvironmentSpec, stat
 		config.Matcher = matcher
 	}
 	path := filepath.Join(root, agent.ID+".json")
-	if err := WritePinnedConfiguration(state, path, []byte(contracts.JSONText(config)), "tool gateway configuration"); err != nil {
+	if err := writeToolGatewayConfig(state, path, config); err != nil {
 		return nil, err
 	}
 	argv := []string{gatewayBinary, "local", "--config", "/state/tool-gateway/" + agent.ID + ".json"}
@@ -119,6 +119,28 @@ func PrepareTools(agent contracts.AgentSpec, env contracts.EnvironmentSpec, stat
 		argv = []string{gatewayBinary, "proxy", "--address", "turnyard-tools:8081"}
 	}
 	return []ToolLaunch{{ID: toolgateway.ServerID, Argv: argv}}, nil
+}
+
+// Adding the built-in request tool does not change any user-granted backend.
+// Upgrade an existing pinned gateway only when its prior bytes match exactly.
+func writeToolGatewayConfig(state, path string, config toolgateway.Config) error {
+	current := []byte(contracts.JSONText(config))
+	prior, err := ReadStateFile(state, path)
+	if errors.Is(err, os.ErrNotExist) {
+		return WritePinnedConfiguration(state, path, current, "tool gateway configuration")
+	}
+	if err != nil {
+		return err
+	}
+	if bytes.Equal(prior, current) {
+		return nil
+	}
+	legacy := config
+	legacy.Backends = config.Backends[:len(config.Backends)-1]
+	if !bytes.Equal(prior, []byte(contracts.JSONText(legacy))) {
+		return fault.New(fault.CodeEnvironmentDrift, "tool gateway configuration changed within this session")
+	}
+	return writeStateFile(state, path, current)
 }
 
 func toolSearchMatcher(env contracts.EnvironmentSpec) (*toolgateway.MatcherConfig, error) {
@@ -149,7 +171,7 @@ func requiredCredential(capability, name string) (string, error) {
 // ToolGatewayFor gives the sandbox the credentialed gateway configuration.
 // The agent-side MCP proxy receives neither these values nor backend commands.
 func ToolGatewayFor(input AgentInvocation, agent contracts.AgentSpec) (*sandbox.ToolGateway, error) {
-	if !usesToolSidecar(input.Environment) || len(agent.Tools) == 0 && len(agent.Delegates) == 0 {
+	if !usesToolSidecar(input.Environment) {
 		return nil, nil
 	}
 	credentials := make(map[string]string)

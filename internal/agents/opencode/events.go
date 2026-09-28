@@ -17,7 +17,6 @@ type openCodeEvent struct {
 	SessionID string `json:"sessionID"`
 	Part      struct {
 		Type  string `json:"type"`
-		Text  string `json:"text"`
 		Tool  string `json:"tool"`
 		State struct {
 			Status string `json:"status"`
@@ -31,7 +30,6 @@ type openCodeEvent struct {
 func parseOpenCodeEvents(output string) (agents.AgentResult, error) {
 	result := agents.AgentResult{}
 	ids := map[string]bool{}
-	texts := []string{}
 	called := map[string]bool{}
 	loaded := map[string]bool{}
 	for _, line := range strings.Split(output, "\n") {
@@ -42,9 +40,6 @@ func parseOpenCodeEvents(output string) (agents.AgentResult, error) {
 		result.Events = append(result.Events, json.RawMessage(line))
 		if event.SessionID != "" {
 			ids[event.SessionID] = true
-		}
-		if event.Part.Type == "text" {
-			texts = append(texts, event.Part.Text)
 		}
 		if event.Type != "tool_use" || event.Part.State.Status != "completed" || event.Part.Tool == "" {
 			continue
@@ -60,7 +55,6 @@ func parseOpenCodeEvents(output string) (agents.AgentResult, error) {
 	for id := range ids {
 		result.NativeID = id
 	}
-	result.NeedsInput = agents.NeedsInputQuestion(texts)
 	result.CalledTools = agents.SortedKeys(called)
 	result.LoadedSkills = agents.SortedKeys(loaded)
 	return result, nil

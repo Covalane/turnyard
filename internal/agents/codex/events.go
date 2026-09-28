@@ -18,7 +18,6 @@ type codexEvent struct {
 	Item     struct {
 		Type    string `json:"type"`
 		Status  string `json:"status"`
-		Text    string `json:"text"`
 		Command string `json:"command"`
 		Server  string `json:"server"`
 		Tool    string `json:"tool"`
@@ -27,7 +26,6 @@ type codexEvent struct {
 
 func parseCodexEvents(raw string) (agents.AgentResult, error) {
 	result := agents.AgentResult{}
-	texts := []string{}
 	ids := map[string]bool{}
 	loadedSkills := map[string]bool{}
 	calledTools := map[string]bool{}
@@ -47,9 +45,6 @@ func parseCodexEvents(raw string) (agents.AgentResult, error) {
 			completed = true
 		case "turn.failed":
 			return result, fault.New(fault.CodeAgentFailed, "Codex turn failed")
-		}
-		if event.Item.Type == "agent_message" {
-			texts = append(texts, event.Item.Text)
 		}
 		if event.Type != "item.completed" || event.Item.Status != "completed" {
 			continue
@@ -71,7 +66,6 @@ func parseCodexEvents(raw string) (agents.AgentResult, error) {
 	for id := range ids {
 		result.NativeID = id
 	}
-	result.NeedsInput = agents.NeedsInputQuestion(texts)
 	result.Output = raw
 	result.LoadedSkills = agents.SortedKeys(loadedSkills)
 	result.CalledTools = agents.SortedKeys(calledTools)

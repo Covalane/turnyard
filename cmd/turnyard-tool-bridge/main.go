@@ -53,7 +53,19 @@ func (b *cappedBuffer) Write(data []byte) (int, error) {
 func main() {
 	configPath := flag.String("config", "", "path to a Turnyard executable tool configuration")
 	delegate := flag.Bool("delegate", false, "serve the managed delegation tool")
+	humanInput := flag.Bool("human-input", false, "serve the human input request tool")
 	flag.Parse()
+	if *humanInput {
+		if *configPath != "" || *delegate {
+			fmt.Fprintln(os.Stderr, "human-input mode takes no other mode")
+			os.Exit(2)
+		}
+		if err := serveHumanInput(os.Stdin, os.Stdout, humanInputOutputDir); err != nil {
+			fmt.Fprintln(os.Stderr, err)
+			os.Exit(1)
+		}
+		return
+	}
 	if *delegate {
 		if *configPath != "" {
 			fmt.Fprintln(os.Stderr, "delegate mode takes no config")

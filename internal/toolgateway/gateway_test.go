@@ -2,6 +2,8 @@ package toolgateway
 
 import (
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
@@ -10,8 +12,33 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/Covalane/turnyard/internal/contracts"
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 )
+
+func TestBuiltInHumanInputDoesNotInvalidateExistingCatalogLock(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "catalog.sha256")
+	external := candidate{ID: "allowed/echo", Description: "echo", InputSchema: map[string]any{"type": "object"}}
+	body, err := json.Marshal([]candidate{external})
+	if err != nil {
+		t.Fatal(err)
+	}
+	sum := sha256.Sum256(body)
+	if err := os.WriteFile(path, []byte(hex.EncodeToString(sum[:])+"\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	gateway, err := New(Config{CatalogLock: path}, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	entries := map[string]*catalogEntry{
+		external.ID: {candidate: external},
+		contracts.HumanInputToolID + "/" + contracts.HumanInputToolName: {candidate: candidate{ID: contracts.HumanInputToolID + "/" + contracts.HumanInputToolName}},
+	}
+	if err := gateway.checkCatalogLock(entries); err != nil {
+		t.Fatalf("built-in tool invalidated external catalog lock: %v", err)
+	}
+}
 
 func TestGatewayBackendProcess(t *testing.T) {
 	if os.Getenv("TURNYARD_TEST_GATEWAY_BACKEND") != "1" {

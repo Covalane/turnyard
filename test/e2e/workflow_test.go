@@ -99,7 +99,7 @@ func TestMultiRepoWorkflow(t *testing.T) {
 			t.Fatalf("%s recovery output missing", repo)
 		}
 	}
-	gate := contracts.WorkSpec{SchemaVersion: "turnyard.work/v1", IdempotencyKey: "human-gate", Objective: "暂时不要修改文件。请先询问人类决定问候语。这一轮的最终回复必须完整且仅为：TURNYARD_NEEDS_INPUT: What greeting should I use in both repositories? 收到回复后再更新 api/message.json 和 web/message.txt。", Acceptance: []string{"人工回复后两个仓库的问候语一致"}, Checks: []string{"matching"}}
+	gate := contracts.WorkSpec{SchemaVersion: "turnyard.work/v1", IdempotencyKey: "human-gate", Objective: "暂时不要修改文件。请先通过 Turnyard 工具 request_input 询问人类决定两个仓库的问候语。工具调用成功后结束这一轮，收到回复再更新 api/message.json 和 web/message.txt。", Acceptance: []string{"人工回复后两个仓库的问候语一致"}, Checks: []string{"matching"}}
 	gate.Scope.Repositories = []contracts.ScopeRepo{{ID: "api", Mode: "write"}, {ID: "web", Mode: "write"}}
 	gate.Deliverables = []contracts.DeliverableSpec{{ID: "api-message", Repository: "api", Path: "message.json", Kind: "file"},
 		{ID: "web-message", Repository: "web", Path: "message.txt", Kind: "file"}}

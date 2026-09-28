@@ -12,6 +12,7 @@ import (
 	"github.com/Covalane/turnyard/internal/contracts"
 	"github.com/Covalane/turnyard/internal/fault"
 	"github.com/Covalane/turnyard/internal/gitstate"
+	"github.com/Covalane/turnyard/internal/humaninput"
 	"github.com/Covalane/turnyard/internal/inputs"
 
 	git "github.com/go-git/go-git/v5"
@@ -418,7 +419,13 @@ func TestGoHumanResumeAndFailedCheck(t *testing.T) {
 		calls++
 		if calls == 1 {
 			_ = os.MkdirAll(input.State, 0o700)
-			return AgentResult{NativeID: "ses_native", NeedsInput: "Choose value", ActualProvider: "ollama-cloud"}, nil
+			if err := os.MkdirAll(input.ArtifactDir, 0o700); err != nil {
+				return AgentResult{}, err
+			}
+			if err := humaninput.Write(input.ArtifactDir, "Choose value"); err != nil {
+				return AgentResult{}, err
+			}
+			return AgentResult{NativeID: "ses_native", ActualProvider: "ollama-cloud"}, nil
 		}
 		if input.NativeID != "ses_native" {
 			t.Fatalf("wrong resume native ID %q", input.NativeID)
@@ -435,7 +442,7 @@ func TestGoHumanResumeAndFailedCheck(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if first.Status != "needs_input" {
+	if first.Status != "needs_input" || first.NeedsInput != "Choose value" {
 		t.Fatalf("first: %v", first)
 	}
 	f.sandbox.checkExit = 1
@@ -453,6 +460,21 @@ func TestGoHumanResumeAndFailedCheck(t *testing.T) {
 	}
 	if rechecked.Status != "verified" || calls != 2 {
 		t.Fatalf("verify: %v calls=%d", rechecked, calls)
+	}
+}
+
+func TestAgentTextCannotRequestHumanInput(t *testing.T) {
+	f := newFixture(t)
+	f.driver.run = func(AgentInvocation) (AgentResult, error) {
+		return AgentResult{NativeID: "ses_native", Output: "TURNYARD_NEEDS_INPUT: 无 — 任务已完成", ActualProvider: "ollama-cloud"}, nil
+	}
+	added, err := f.service.AddTask(context.Background(), f.sid, f.task(t, "text-only"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	result, err := f.service.RunTask(context.Background(), added.TaskID, "", false, time.Minute)
+	if err != nil || result.Status != "verified" || result.NeedsInput != "" {
+		t.Fatalf("ordinary agent text changed control flow: %+v %v", result, err)
 	}
 }
 func TestRetryCreatesNumberedCommitForSameTask(t *testing.T) {

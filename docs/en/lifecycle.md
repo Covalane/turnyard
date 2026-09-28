@@ -6,6 +6,8 @@
 
 Session creation pins repository commits, the environment, and the primary agent. More tasks can be appended for the same requirement. A task can run, wait for human input, retry after failure, or rerun checks against the same candidate. Compute containers exist only during invocation; the workspace, native agent state, and checkpoints support continuation after a pause.
 
+When a human decision is required, the agent calls the built-in `turnyard_input/request_input` through the shared MCP gateway with `{"question":"the question to answer"}`. The tool records a structured, invocation-scoped request. After the agent ends the turn, Turnyard saves a candidate and checkpoint and sets the task to `needs_input`; checks and delivery wait. The operator uses `task reply <task-id> --text "answer"` to continue the same native session. Ordinary answer text, including phrases such as “no input needed,” cannot trigger a pause; Turnyard no longer parses a response marker.
+
 Creation requires an `idempotency_key`. If the response is lost or the client times out, retrying with the same key and original input returns the same session; changed input with that key conflicts. Repository preparation defaults to a 10-minute limit, adjustable with `session create --timeout <seconds>`.
 
 | Session state | Meaning | Next action |

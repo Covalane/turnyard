@@ -1,9 +1,13 @@
 package opencode
 
 import (
+	"encoding/json"
+	"os"
+	"path/filepath"
 	"reflect"
 	"testing"
 
+	"github.com/Covalane/turnyard/internal/contracts"
 	"github.com/Covalane/turnyard/internal/fault"
 )
 
@@ -19,5 +23,34 @@ func TestParseOpenCodeEvents(t *testing.T) {
 	_, err = parseOpenCodeEvents(raw + "\n" + `{"type":"text","sessionID":"ses_2"}`)
 	if fault.CodeOf(err) != fault.CodeNativeSessionMismatch {
 		t.Fatalf("multiple sessions accepted: %v", err)
+	}
+}
+
+func TestOpenCodeNoToolSessionGainsInputCapability(t *testing.T) {
+	state := t.TempDir()
+	binding := contracts.ModelBinding{Provider: "ollama-cloud", Model: "glm-5.3-flash", CredentialEnv: "OLLAMA_API_KEY"}
+	agent := contracts.AgentSpec{ID: "lead"}
+	if _, err := prepareOpenCode(contracts.EnvironmentSpec{}, agent, binding, state); err != nil {
+		t.Fatal(err)
+	}
+	path := filepath.Join(state, "config", "opencode", "opencode.json")
+	current, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var previous map[string]any
+	if err := json.Unmarshal(current, &previous); err != nil {
+		t.Fatal(err)
+	}
+	delete(previous, "mcp")
+	if err := os.WriteFile(path, []byte(contracts.JSONText(previous)), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := prepareOpenCode(contracts.EnvironmentSpec{}, agent, binding, state); err != nil {
+		t.Fatalf("additive configuration upgrade failed: %v", err)
+	}
+	upgraded, err := os.ReadFile(path)
+	if err != nil || string(upgraded) != string(current) {
+		t.Fatalf("OpenCode configuration drifted: %v", err)
 	}
 }

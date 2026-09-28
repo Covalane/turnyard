@@ -151,3 +151,9 @@ Podman 5.8.7 的官方容器镜像在独立 Linux/arm64 容器中以 VFS 存储�
 附件暂存失败或任务入库被拒后立即清理该批次；supervisor 重启时读取已入库任务的附件引用，仅清除无人引用的摘要目录。针对性测试覆盖部分附件失败、任务拒绝、启动后保留已提交批次并删除崩溃遗留批次。仓库准备和附件接收有独立并发与等待上限，测试覆盖等待、队列拒绝和名额释放。`task add` 的默认请求时限已扩至 20 分钟，使准备阶段排队和附件下载能落在同一请求时限内。
 
 SQLite 从 Ent 自动建表改为编号 SQL 迁移。测试覆盖新库基线、无版本旧库备份和基准记录导入、重复打开、修改或过新的版本拒绝、失败事务回滚，以及 Ent 结构与 SQL 基线一致。另将此前双仓库运行的真实无版本库用 SQLite `.backup` 复制到被忽略的 `.turnyard/migration-verification-20260928/`，仅升级副本：升级前后均为 1 个会话、4 个任务、5 个候选和 10 个检查点，版本记为 1，`integrity_check` 返回 `ok`，`foreign_key_check` 无记录；重复打开没有新建第二份迁移备份。此处仍是本地存储验证；本次修改后的真实云代理、不同沙箱和大型历史数据库尚未重跑。
+
+## 2026-09-29 结构化人工输入请求
+
+人工输入从最终回答的 `TURNYARD_NEEDS_INPUT` 文本标记改为内置 MCP 工具 `turnyard_input/request_input`。上述关于旧标记解析的记录仅描述当时版本。单元测试覆盖：无请求时不暂停、结构化请求的尺寸与格式校验、符号链接拒绝、相同问题的重复调用、不同问题的冲突、旧工具配置的受限升级，以及任务暂停后在同一原生会话中继续。`go test ./...`、`go test -race ./...`、`go vet ./...` 和 `git diff --check` 通过；Docker 镜像 `turnyard-agent:human-input-dev` 构建成功。
+
+真实 Docker `model-only` + OpenCode + Ollama Cloud `glm-5.3-flash` 的双仓库四任务链路通过：`.turnyard/e2e-go-20260929-001536-468f91c85f03fdb0/evidence.json`。人工输入任务先请求人选择问候语，状态成为 `needs_input`；收到 `task reply` 后，原生会话 ID 保持不变并完成候选校验。工具网关日志明确记录 `turnyard_input/request_input` 调用成功。该证据覆盖这一种代理、模型和沙箱组合；其他运行时与沙箱的该新工具路径尚未真实复验。

@@ -35,6 +35,7 @@ func prepareOpenCode(env contracts.EnvironmentSpec, agent contracts.AgentSpec, b
 			"edit":               map[string]string{"/turnyard-control/delegations/**": "deny"},
 		}
 	}
+	previous := contracts.JSONText(config)
 	configDir := filepath.Join(state, "config", "opencode")
 	if err := agents.EnsureStateDirectory(state, configDir); err != nil {
 		return "", err
@@ -52,7 +53,11 @@ func prepareOpenCode(env contracts.EnvironmentSpec, agent contracts.AgentSpec, b
 	}
 	expected := contracts.JSONText(config)
 	configPath := filepath.Join(configDir, "opencode.json")
-	if err := agents.WritePinnedConfiguration(state, configPath, []byte(expected), "OpenCode configuration"); err != nil {
+	if len(agent.Tools) == 0 && len(agent.Delegates) == 0 {
+		if err := agents.WritePinnedAdditiveConfiguration(state, configPath, []byte(expected), []byte(previous), "OpenCode configuration"); err != nil {
+			return "", err
+		}
+	} else if err := agents.WritePinnedConfiguration(state, configPath, []byte(expected), "OpenCode configuration"); err != nil {
 		return "", err
 	}
 	for _, id := range agent.Skills {
@@ -174,7 +179,6 @@ func (Driver) Invoke(ctx context.Context, input agents.AgentInvocation) (agents.
 	output.NativeID = parsed.NativeID
 	output.Output = run.Output
 	output.Events = parsed.Events
-	output.NeedsInput = parsed.NeedsInput
 	output.ExitCode = 0
 	output.ActualProvider = provider
 	output.ActualModel = actual

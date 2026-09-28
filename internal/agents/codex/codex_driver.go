@@ -39,6 +39,7 @@ func prepareCodex(binding contracts.ModelBinding, agent contracts.AgentSpec, env
 		return err
 	}
 	config := "model = " + strconv.Quote(binding.Model) + "\n" + "model_provider = " + strconv.Quote(binding.Provider) + "\npreferred_auth_method = \"apikey\"\n" + "forced_login_method = \"api\"\nweb_search = \"disabled\"\n" + "[model_providers." + binding.Provider + "]\nname = " + strconv.Quote(provider.Name) + "\n" + "base_url = " + strconv.Quote(endpoint) + "\n" + "wire_api = \"responses\"\n" + "env_key = " + strconv.Quote(binding.CredentialEnv) + "\n"
+	previousConfig := config
 	for _, id := range agent.Skills {
 		skill, err := agents.SelectedSkill(env, id)
 		if err != nil {
@@ -73,6 +74,9 @@ func prepareCodex(binding contracts.ModelBinding, agent contracts.AgentSpec, env
 		}
 	}
 	path := filepath.Join(root, "config.toml")
+	if len(agent.Tools) == 0 && len(agent.Delegates) == 0 {
+		return agents.WritePinnedAdditiveConfiguration(state, path, []byte(config), []byte(previousConfig), "Codex configuration")
+	}
 	return agents.WritePinnedConfiguration(state, path, []byte(config), "Codex configuration")
 }
 func (Driver) Invoke(ctx context.Context, input agents.AgentInvocation) (agents.AgentResult, error) {

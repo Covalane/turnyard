@@ -11,7 +11,6 @@ import (
 
 type kimiEvent struct {
 	Role      string `json:"role"`
-	Content   string `json:"content"`
 	ToolCalls []struct {
 		Function struct {
 			Name      string `json:"name"`
@@ -67,9 +66,8 @@ func verifyKimiModel(state, native, expected string) error {
 	return nil
 }
 
-func parseKimiEvents(raw string) ([]json.RawMessage, []string, []string, []string) {
+func parseKimiEvents(raw string) ([]json.RawMessage, []string, []string) {
 	events := []json.RawMessage{}
-	texts := []string{}
 	called := map[string]bool{}
 	loaded := map[string]bool{}
 	for _, line := range strings.Split(raw, "\n") {
@@ -80,9 +78,6 @@ func parseKimiEvents(raw string) ([]json.RawMessage, []string, []string, []strin
 		events = append(events, json.RawMessage(line))
 		if event.Role != "assistant" {
 			continue
-		}
-		if event.Content != "" {
-			texts = append(texts, event.Content)
 		}
 		for _, call := range event.ToolCalls {
 			name := call.Function.Name
@@ -101,5 +96,5 @@ func parseKimiEvents(raw string) ([]json.RawMessage, []string, []string, []strin
 			}
 		}
 	}
-	return events, texts, agents.SortedKeys(called), agents.SortedKeys(loaded)
+	return events, agents.SortedKeys(called), agents.SortedKeys(loaded)
 }

@@ -140,7 +140,7 @@ func LoadSession(path string) (SessionSpec, EnvironmentSpec, error) {
 	ids = ids[:0]
 	for i := range env.Tools {
 		t := &env.Tools[i]
-		if t.ID == DelegationToolID {
+		if t.ID == DelegationToolID || t.ID == HumanInputToolID {
 			return session, env, fault.New(fault.CodeInvalidSpec, "tool ID %s is reserved", DelegationToolID)
 		}
 		ids = append(ids, t.ID)

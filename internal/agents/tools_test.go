@@ -95,6 +95,50 @@ func TestToolCatalogLockSurvivesAgentStateRestore(t *testing.T) {
 	}
 }
 
+func TestHumanInputToolIsAlwaysAvailable(t *testing.T) {
+	agent := contracts.AgentSpec{ID: "lead"}
+	launches, err := agents.PrepareTools(agent, contracts.EnvironmentSpec{}, t.TempDir())
+	if err != nil || len(launches) != 1 || launches[0].ID != toolgateway.ServerID {
+		t.Fatalf("built-in tool gateway: %+v %v", launches, err)
+	}
+}
+
+func TestExistingToolGatewayGainsOnlyBuiltInInputTool(t *testing.T) {
+	state := t.TempDir()
+	agent := contracts.AgentSpec{ID: "lead", Tools: []string{"helper"}}
+	env := contracts.EnvironmentSpec{Tools: []contracts.ToolSpec{{ID: "helper", Kind: contracts.ToolKindExecutable,
+		Description: "Helper", Argv: []string{"/bin/true"}}}}
+	if _, err := agents.PrepareTools(agent, env, state); err != nil {
+		t.Fatal(err)
+	}
+	path := filepath.Join(state, "tool-gateway", "lead.json")
+	body, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var current toolgateway.Config
+	if err := json.Unmarshal(body, &current); err != nil || len(current.Backends) != 2 {
+		t.Fatalf("current gateway config: %s %v", body, err)
+	}
+	current.Backends = current.Backends[:1]
+	if err := os.WriteFile(path, []byte(contracts.JSONText(current)), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := agents.PrepareTools(agent, env, state); err != nil {
+		t.Fatalf("additive built-in migration failed: %v", err)
+	}
+	updated, err := os.ReadFile(path)
+	if err != nil || string(updated) != string(body) {
+		t.Fatalf("gateway migration changed unrelated config: %v %s", err, updated)
+	}
+	if err := os.WriteFile(path, []byte(`{"backends":[]}`), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := agents.PrepareTools(agent, env, state); fault.CodeOf(err) != fault.CodeEnvironmentDrift {
+		t.Fatalf("unrelated drift accepted: %v", err)
+	}
+}
+
 func TestToolCredentialsMustBePresent(t *testing.T) {
 	name := "TURNYARD_TOOL_TEST_CREDENTIAL"
 	t.Setenv(name, "value")

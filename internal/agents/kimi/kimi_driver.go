@@ -140,18 +140,16 @@ func (Driver) Invoke(ctx context.Context, input agents.AgentInvocation) (agents.
 	} else if !agents.SlicesContains(after, native) {
 		return output, fault.New(fault.CodeNativeSessionMismatch, "Kimi did not retain the resumed native session")
 	}
-	events, texts, called, loaded := parseKimiEvents(run.Output)
+	events, called, loaded := parseKimiEvents(run.Output)
 	if len(events) == 0 {
 		return output, fault.New(fault.CodeAgentOutputInvalid, "Kimi emitted no JSON events")
 	}
 	if err := verifyKimiModel(input.State, native, binding.Model); err != nil {
 		return output, err
 	}
-	needs := agents.NeedsInputQuestion(texts)
 	output.NativeID = native
 	output.Output = run.Output
 	output.Events = events
-	output.NeedsInput = needs
 	output.ActualProvider = binding.Provider
 	output.ActualModel = binding.Model
 	output.CalledTools = called

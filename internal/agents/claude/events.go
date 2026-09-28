@@ -12,12 +12,10 @@ type claudeEvent struct {
 	Type      string `json:"type"`
 	SessionID string `json:"session_id"`
 	IsError   bool   `json:"is_error"`
-	Result    string `json:"result"`
 	Message   struct {
 		Model   string `json:"model"`
 		Content []struct {
 			Type  string `json:"type"`
-			Text  string `json:"text"`
 			Name  string `json:"name"`
 			Input struct {
 				Skill string `json:"skill"`
@@ -28,7 +26,6 @@ type claudeEvent struct {
 
 func parseClaudeEvents(raw string, expected string) (agents.AgentResult, error) {
 	result := agents.AgentResult{}
-	texts := []string{}
 	models := map[string]bool{}
 	ids := map[string]bool{}
 	loaded := map[string]bool{}
@@ -49,8 +46,6 @@ func parseClaudeEvents(raw string, expected string) (agents.AgentResult, error) 
 			}
 			for _, part := range event.Message.Content {
 				switch part.Type {
-				case "text":
-					texts = append(texts, part.Text)
 				case "tool_use":
 					if part.Name == "" {
 						continue
@@ -66,7 +61,6 @@ func parseClaudeEvents(raw string, expected string) (agents.AgentResult, error) 
 			if event.IsError {
 				return result, fault.New(fault.CodeAgentFailed, "Claude result reported an error")
 			}
-			texts = append(texts, event.Result)
 		}
 	}
 	if !completed || len(ids) != 1 {
@@ -83,7 +77,6 @@ func parseClaudeEvents(raw string, expected string) (agents.AgentResult, error) 
 			return result, fault.New(fault.CodeModelMismatch, "Claude used model %s instead of %s", model, expected)
 		}
 	}
-	result.NeedsInput = agents.NeedsInputQuestion(texts)
 	result.Output = raw
 	result.LoadedSkills = agents.SortedKeys(loaded)
 	result.ActualModel = expected

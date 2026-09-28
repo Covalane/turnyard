@@ -111,3 +111,22 @@ func WritePinnedConfiguration(root, path string, body []byte, label string) erro
 	}
 	return writeStateFile(root, path, body)
 }
+
+// WritePinnedAdditiveConfiguration accepts one exact prior representation for
+// an additive built-in capability upgrade. All other state drift is rejected.
+func WritePinnedAdditiveConfiguration(root, path string, current, previous []byte, label string) error {
+	prior, err := ReadStateFile(root, path)
+	if errors.Is(err, os.ErrNotExist) {
+		return WritePinnedConfiguration(root, path, current, label)
+	}
+	if err != nil {
+		return err
+	}
+	if bytes.Equal(prior, current) {
+		return nil
+	}
+	if !bytes.Equal(prior, previous) {
+		return fault.New(fault.CodeEnvironmentDrift, "%s changed within this session", label)
+	}
+	return writeStateFile(root, path, current)
+}
