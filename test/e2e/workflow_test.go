@@ -40,8 +40,8 @@ func TestMultiRepoWorkflow(t *testing.T) {
 	})
 	h.save("environment.json", env)
 	session := contracts.SessionSpec{SchemaVersion: "turnyard.session/v1", IdempotencyKey: "multi-repo-workflow", Repositories: []contracts.RepositorySpec{{ID: "api", Type: "local-git", Path: api, Commit: apiSHA}, {ID: "web", Type: "local-git", Path: web, Commit: webSHA}}, Environment: "environment.json", PrimaryAgent: "lead"}
-	sid := required(t, h.invoke("session", "create", "--file", h.save("session.json", session)), "sessionId")
-	h.evidence["sessionId"] = sid
+	sid := required(t, h.invoke("session", "create", "--file", h.save("session.json", session)), "session_id")
+	h.evidence["session_id"] = sid
 	first := h.submitDeclared(sid, "hello", "在 api/message.json 中创建只包含 greeting 为 hello 的 JSON 对象；在 web/message.txt 中写入 hello。两个仓库的内容需要一致。", []string{"matching"}, []string{"api", "web"},
 		contracts.DeliverableSpec{ID: "api-message", Repository: "api", Path: "message.json", Kind: "file"},
 		contracts.DeliverableSpec{ID: "web-message", Repository: "web", Path: "message.txt", Kind: "file"})
@@ -66,7 +66,7 @@ func TestMultiRepoWorkflow(t *testing.T) {
 		}
 		var p map[string]any
 		if json.Unmarshal([]byte(str(e, "payload")), &p) == nil {
-			checkpoint = str(p, "checkpointId")
+			checkpoint = str(p, "checkpoint_id")
 		}
 	}
 	if checkpoint == "" {
@@ -103,7 +103,7 @@ func TestMultiRepoWorkflow(t *testing.T) {
 	gate.Scope.Repositories = []contracts.ScopeRepo{{ID: "api", Mode: "write"}, {ID: "web", Mode: "write"}}
 	gate.Deliverables = []contracts.DeliverableSpec{{ID: "api-message", Repository: "api", Path: "message.json", Kind: "file"},
 		{ID: "web-message", Repository: "web", Path: "message.txt", Kind: "file"}}
-	tid := required(t, h.invoke("task", "add", sid, "--file", h.save("human-gate.json", gate)), "taskId")
+	tid := required(t, h.invoke("task", "add", sid, "--file", h.save("human-gate.json", gate)), "task_id")
 	h.invoke("task", "run", tid)
 	waiting := h.invoke("task", "wait", tid)
 	if str(waiting, "task", "status") != "needs_input" {
@@ -111,7 +111,7 @@ func TestMultiRepoWorkflow(t *testing.T) {
 	}
 	h.invoke("task", "reply", tid, "--text", "Use hallo. Update both greeting files now; do not ask again.")
 	completed := h.invoke("task", "wait", tid)
-	if got := h.verified("humanGate", completed, "api", "web"); got != native {
+	if got := h.verified("human_gate", completed, "api", "web"); got != native {
 		t.Fatalf("human gate native session changed: %q -> %q", native, got)
 	}
 	h.assertDeliverables(completed, "api-message", "web-message")
@@ -119,9 +119,9 @@ func TestMultiRepoWorkflow(t *testing.T) {
 		t.Fatalf("human reply greeting=%q", got)
 	}
 	h.assertFixture(workspace, "api", "verify.go", []byte(greetingCheck))
-	h.evidence["nativeSessionId"] = native
+	h.evidence["native_session_id"] = native
 	closed := h.invoke("session", "complete", sid)
-	if str(closed, "schemaVersion") != "turnyard.session-completion/v1" || str(closed, "status") != "completed" {
+	if str(closed, "schema_version") != "turnyard.session-completion/v1" || str(closed, "status") != "completed" {
 		t.Fatalf("session did not complete: %v", closed)
 	}
 	deliveries, _ := closed["deliveries"].([]any)
@@ -130,7 +130,7 @@ func TestMultiRepoWorkflow(t *testing.T) {
 	}
 	for _, entry := range deliveries {
 		item, _ := entry.(map[string]any)
-		if str(item, "status") != "verified" || str(item, "candidateDigest") == "" {
+		if str(item, "status") != "verified" || str(item, "candidate_digest") == "" {
 			t.Fatalf("unverified completion entry: %v", item)
 		}
 		outputs, _ := item["deliverables"].([]any)
@@ -150,10 +150,10 @@ func TestSessionCancellation(t *testing.T) {
 	env := h.environment([]contracts.CheckSpec{{ID: "readme", Argv: []string{"test", "-f", "/workspace/code/README.md"}, Repositories: []string{"code"}}})
 	h.save("environment.json", env)
 	session := contracts.SessionSpec{SchemaVersion: "turnyard.session/v1", IdempotencyKey: "cancel-workflow", Repositories: []contracts.RepositorySpec{{ID: "code", Type: "local-git", Path: code, Commit: sha}}, Environment: "environment.json", PrimaryAgent: "lead"}
-	sid := required(t, h.invoke("session", "create", "--file", h.save("session.json", session)), "sessionId")
+	sid := required(t, h.invoke("session", "create", "--file", h.save("session.json", session)), "session_id")
 	work := contracts.WorkSpec{SchemaVersion: "turnyard.work/v1", IdempotencyKey: "withdrawn", Objective: "Add a feature", Acceptance: []string{"Feature exists"}, Checks: []string{"readme"}}
 	work.Scope.Repositories = []contracts.ScopeRepo{{ID: "code", Mode: "write"}}
-	tid := required(t, h.invoke("task", "add", sid, "--file", h.save("work.json", work)), "taskId")
+	tid := required(t, h.invoke("task", "add", sid, "--file", h.save("work.json", work)), "task_id")
 	closed := h.invoke("session", "cancel", sid, "--reason", "requirement withdrawn")
 	if str(closed, "status") != "cancelled" || str(closed, "reason") != "requirement withdrawn" {
 		t.Fatalf("cancellation response: %v", closed)

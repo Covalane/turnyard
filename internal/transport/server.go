@@ -24,11 +24,11 @@ import (
 
 type Request struct {
 	Action       Action `json:"action"`
-	RequestID    string `json:"requestId,omitempty"`
+	RequestID    string `json:"request_id,omitempty"`
 	File         string `json:"file,omitempty"`
-	SessionID    string `json:"sessionId,omitempty"`
-	TaskID       string `json:"taskId,omitempty"`
-	CheckpointID string `json:"checkpointId,omitempty"`
+	SessionID    string `json:"session_id,omitempty"`
+	TaskID       string `json:"task_id,omitempty"`
+	CheckpointID string `json:"checkpoint_id,omitempty"`
 	After        int64  `json:"after,omitempty"`
 	Reply        string `json:"reply,omitempty"`
 	Reason       string `json:"reason,omitempty"`
@@ -39,7 +39,7 @@ type Response struct {
 	OK        bool         `json:"ok"`
 	Result    any          `json:"result,omitempty"`
 	Error     *fault.Error `json:"error,omitempty"`
-	RequestID string       `json:"requestId,omitempty"`
+	RequestID string       `json:"request_id,omitempty"`
 }
 
 const scheduledOperationVerify = "verify"
@@ -91,12 +91,12 @@ func NewSupervisor(ctx context.Context, home string) (*Supervisor, error) {
 		observe.Log.InfoContext(ctx, "orphaned input batches removed", "count", pruned)
 	}
 	if len(recovered) > 0 {
-		observe.Log.WarnContext(ctx, "interrupted invocations marked unknown", "count", len(recovered), "taskIds", recovered)
+		observe.Log.WarnContext(ctx, "interrupted invocations marked unknown", "count", len(recovered), "task_ids", recovered)
 		for _, tid := range recovered {
 			if err := service.StopTaskContainers(ctx, tid); err != nil {
 				observe.LogFailure(observe.WithIDs(ctx, observe.IDs{TaskID: tid}), "interrupted container cleanup unconfirmed", err)
 			} else {
-				observe.Log.InfoContext(ctx, "interrupted containers stopped", "taskId", tid)
+				observe.Log.InfoContext(ctx, "interrupted containers stopped", "task_id", tid)
 			}
 		}
 	}
@@ -145,15 +145,15 @@ func (s *Supervisor) schedule(ctx context.Context, tid, reply string, retry bool
 			s.mu.Unlock()
 		}()
 		started := time.Now()
-		observe.Log.InfoContext(runCtx, "task run started", "sessionId", task.SessionID, "taskId", tid, "retry", retry)
+		observe.Log.InfoContext(runCtx, "task run started", "session_id", task.SessionID, "task_id", tid, "retry", retry)
 		_, err := s.Service.RunTask(runCtx, tid, reply, retry, time.Duration(timeout)*time.Second)
 		if err != nil {
-			observe.LogFailure(runCtx, "task run failed", fault.Ensure(err, "run task"), "durationMs", time.Since(started).Milliseconds())
+			observe.LogFailure(runCtx, "task run failed", fault.Ensure(err, "run task"), "duration_ms", time.Since(started).Milliseconds())
 		} else {
-			observe.Log.InfoContext(runCtx, "task run finished", "sessionId", task.SessionID, "taskId", tid, "durationMs", time.Since(started).Milliseconds())
+			observe.Log.InfoContext(runCtx, "task run finished", "session_id", task.SessionID, "task_id", tid, "duration_ms", time.Since(started).Milliseconds())
 		}
 	}()
-	return map[string]any{"taskId": tid, "accepted": true}, nil
+	return map[string]any{"task_id": tid, "accepted": true}, nil
 }
 func (s *Supervisor) scheduleVerify(ctx context.Context, tid string) (map[string]any, error) {
 	ctx = observe.WithIDs(ctx, observe.IDs{TaskID: tid})
@@ -179,15 +179,15 @@ func (s *Supervisor) scheduleVerify(ctx context.Context, tid string) (map[string
 			s.mu.Unlock()
 		}()
 		started := time.Now()
-		observe.Log.InfoContext(runCtx, "candidate verification started", "sessionId", task.SessionID, "taskId", tid)
+		observe.Log.InfoContext(runCtx, "candidate verification started", "session_id", task.SessionID, "task_id", tid)
 		_, err := s.Service.VerifyCandidate(runCtx, tid)
 		if err != nil {
-			observe.LogFailure(runCtx, "candidate verification failed", fault.Ensure(err, "verify candidate"), "durationMs", time.Since(started).Milliseconds())
+			observe.LogFailure(runCtx, "candidate verification failed", fault.Ensure(err, "verify candidate"), "duration_ms", time.Since(started).Milliseconds())
 		} else {
-			observe.Log.InfoContext(runCtx, "candidate verification finished", "sessionId", task.SessionID, "taskId", tid, "durationMs", time.Since(started).Milliseconds())
+			observe.Log.InfoContext(runCtx, "candidate verification finished", "session_id", task.SessionID, "task_id", tid, "duration_ms", time.Since(started).Milliseconds())
 		}
 	}()
-	return map[string]any{"taskId": tid, "accepted": true, "operation": scheduledOperationVerify}, nil
+	return map[string]any{"task_id": tid, "accepted": true, "operation": scheduledOperationVerify}, nil
 }
 func (s *Supervisor) Dispatch(ctx context.Context, req Request) (any, error) {
 	s.mu.Lock()
@@ -205,7 +205,7 @@ func (s *Supervisor) Dispatch(ctx context.Context, req Request) (any, error) {
 	switch req.Action {
 	case actionPing:
 		return map[string]any{"ok": true, "pid": os.Getpid(), "capacity": s.Service.Capacity.Status(),
-			"stateBytes": s.stateBytes.Load(), "stateWarning": s.stateWarned.Load()}, nil
+			"state_bytes": s.stateBytes.Load(), "state_warning": s.stateWarned.Load()}, nil
 	case actionSessionCreate:
 		return s.Service.CreateSession(ctx, req.File)
 	case actionSessionShow:

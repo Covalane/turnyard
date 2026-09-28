@@ -24,9 +24,9 @@ type DeliverableResult struct {
 	Commit         string                      `json:"commit"`
 	Status         contracts.DeliverableStatus `json:"status"`
 	SHA256         string                      `json:"sha256,omitempty"`
-	ExpectedSHA256 string                      `json:"expectedSha256,omitempty"`
+	ExpectedSHA256 string                      `json:"expected_sha256,omitempty"`
 	Bytes          int64                       `json:"bytes"`
-	ErrorCode      string                      `json:"errorCode,omitempty"`
+	ErrorCode      string                      `json:"error_code,omitempty"`
 }
 
 const (

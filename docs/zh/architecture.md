@@ -40,7 +40,7 @@ Turnyard 的边界是一台机器及其状态目录。上层系统决定任务�
 
 `AgentDriver` 负责验证模型绑定、启动与解析一个原生代理；四个实现分别位于 `internal/agents/{claude,codex,kimi,opencode}`，由 `internal/agents/registry` 显式组装，不使用初始化时的隐式注册。新增驱动必须明确如何传递凭据、恢复原生 ID、证明实际模型，以及识别人工交互和工具调用。
 
-内置模型提供方的端点、凭据名与可用 API 协议集中在 `internal/agents/model_provider.go`；各驱动选择自己支持的协议，保留 CLI 专有的配置和模型证据解析。其他提供方可在可信的 `modelBinding.endpoints` 中按 `openaiChat`、`anthropic` 或 `responses` 明确给出 HTTPS 地址和凭据变量，无须修改驱动。内置提供方不接受覆盖端点，避免误把其固定凭据发送到另一个地址。配置可被接受不等于该提供方与模型已通过真实链路验收。
+内置模型提供方的端点、凭据名与可用 API 协议集中在 `internal/agents/model_provider.go`；各驱动选择自己支持的协议，保留 CLI 专有的配置和模型证据解析。其他提供方可在可信的 `model_binding.endpoints` 中按 `openai_chat`、`anthropic` 或 `responses` 明确给出 HTTPS 地址和凭据变量，无须修改驱动。内置提供方不接受覆盖端点，避免误把其固定凭据发送到另一个地址。配置可被接受不等于该提供方与模型已通过真实链路验收。
 
 环境 JSON Schema 只约束运行时、沙箱、提供方、凭据变量和工具类型的名字格式。会话创建时由 `DriverFactory`、`BackendFactory` 和驱动的能力检查判定这些名字是否真的可用；因此增加新实现不需要把名字写进 Schema 枚举。未安装的实现仍会在创建会话时被拒绝。
 
@@ -50,13 +50,13 @@ Turnyard 的边界是一台机器及其状态目录。上层系统决定任务�
 
 执行器对创建会话、追加任务、运行任务、复验、恢复与完成等操作返回显式结果类型；持久层将 Ent 实体转换为领域读模型，再由传输层序列化为 JSON。任务执行依次准备 Git 分支、调用代理、固化候选和运行检查；沙箱把挂载与凭据参数组装收在后端内部。
 
-Session、Environment、Work 输入和 Turnyard 自定义的 RPC 字段使用 `lowerCamelCase`，以各自的 JSON Schema 和版本号为准。代理原生事件、GitHub 响应及 Ent 生成代码保留来源系统的字段名。目前 `session show`、`task show` 的部分嵌套读模型直接包含 `store` 行，因此仍有 `session_id` 等 `snake_case` 字段；这些也是现有输出契约的一部分。若统一结果字段，应新增版本化的输出 DTO 并提供兼容路径，不能只改 struct tag 使旧客户端静默失效。
+Turnyard 自有的 Session、Environment、Work 输入、RPC 结果、委派消息、产物声明及日志字段统一使用 `snake_case`。当前仍为未正式发布的 v1 契约；先前以驼峰字段生成的测试输入或状态数据需要重新生成。代理原生事件、MCP、Docker、GitHub 及 JSON Schema 标准字段遵循各自的外部协议，不改写为 Turnyard 命名。
 
 存储模型由 `internal/store/ent/schema` 定义，`go generate ./internal/store` 再生成为 `internal/store/ent`。`store` 把生成实体转换成稳定的领域结果，并拥有事务边界。打开已有工作区时会把旧的 `task_repositories` 基准数据一次性导入 `task_bases`，重复打开不会重复写入。OpenCode 驱动读取的是该 CLI 自己的原生 SQLite 会话文件，不属于 Turnyard 的业务数据库，按其原生格式只读校验模型证据。
 
 模型绑定与代理 ID 分离，但**不是任意运行时与任意模型都可组合**。每个驱动负责验证自己的提供方兼容性；当前通过真实链路的组合见[验证记录](validation.md)。
 
-`Session.primaryAgent` 指定主代理；环境内的其他代理不会自动启动。主代理通过 `agents[].delegates` 获得受管委派工具，子任务使用独立会话、工作区和候选结果；运行时原生子代理仍由运行时自行管理。委派的状态、隔离与产出约束见[主代理与委派边界](delegation.md)。
+`Session.primary_agent` 指定主代理；环境内的其他代理不会自动启动。主代理通过 `agents[].delegates` 获得受管委派工具，子任务使用独立会话、工作区和候选结果；运行时原生子代理仍由运行时自行管理。委派的状态、隔离与产出约束见[主代理与委派边界](delegation.md)。
 
 ## 恢复与审阅边界
 

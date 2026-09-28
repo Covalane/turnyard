@@ -139,7 +139,7 @@ func (b OCIBackend) Run(ctx context.Context, input SandboxRun) (result SandboxRe
 		return result, fault.Wrap(fault.CodeSandboxUnavailable, "", err, "start %s", b.Name())
 	}
 	operationalLog.InfoContext(ctx, "sandbox started", "backend", b.Name(), "isolation", input.Sandbox.Isolation, "container", input.Name,
-		"image", input.Sandbox.Image, "cpu", cpus, "memoryMB", memory, "timeoutSeconds", input.Timeout.Seconds())
+		"image", input.Sandbox.Image, "cpu", cpus, "memory_mb", memory, "timeout_seconds", input.Timeout.Seconds())
 	done := make(chan error, 1)
 	go func() { done <- cmd.Wait() }()
 	timer := time.NewTimer(input.Timeout)
@@ -219,9 +219,9 @@ func (b OCIBackend) Run(ctx context.Context, input SandboxRun) (result SandboxRe
 		return result, err
 	}
 	operationalLog.InfoContext(ctx, "sandbox finished", "backend", b.Name(), "isolation", input.Sandbox.Isolation, "container", input.Name,
-		"exitCode", result.ExitCode, "timedOut", result.TimedOut,
-		"outputTruncated", stdout.truncated || stderr.truncated, "durationMs", time.Since(started).Milliseconds(),
-		"logPath", input.LogPath)
+		"exit_code", result.ExitCode, "timed_out", result.TimedOut,
+		"output_truncated", stdout.truncated || stderr.truncated, "duration_ms", time.Since(started).Milliseconds(),
+		"log_path", input.LogPath)
 	if inspectError != nil {
 		return result, fault.Wrap(fault.CodeSandboxCleanupUnknown, "confirm container cleanup", errors.Join(cleanupError, inspectError), "cannot confirm container %s is absent", input.Name)
 	}

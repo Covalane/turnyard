@@ -119,7 +119,7 @@ func runCLI(ctx context.Context, args []string) (map[string]any, error) {
 			p, err := b.Probe(ctx)
 			if err != nil {
 				observe.LogFailure(ctx, "sandbox doctor probe failed", err, "backend", name)
-				p["errorCode"] = fault.CodeOf(err)
+				p["error_code"] = fault.CodeOf(err)
 			}
 			probes[name] = p
 		}
@@ -127,8 +127,8 @@ func runCLI(ctx context.Context, args []string) (map[string]any, error) {
 		for _, name := range []string{"OLLAMA_API_KEY", "OLLAMA_2_API_KEY", "DEEPSEEK_API_KEY", "OPENAI_API_KEY"} {
 			credentials[name] = os.Getenv(name) != ""
 		}
-		probes["credentialEnvironmentPresent"] = credentials
-		probes["agentRuntimes"] = registry.Runtimes()
+		probes["credential_environment_present"] = credentials
+		probes["agent_runtimes"] = registry.Runtimes()
 		probes["home"] = home
 		return probes, nil
 	case "daemon":
@@ -258,7 +258,7 @@ func runCLI(ctx context.Context, args []string) (map[string]any, error) {
 					return nil, fault.Wrap(fault.CodeInternalError, "remove checkpoint", err, "database pruned; remove checkpoint files using verified backup")
 				}
 			}
-			return map[string]any{"sessionId": id, "pruned": true, "backup": backup}, nil
+			return map[string]any{"session_id": id, "pruned": true, "backup": backup}, nil
 		}
 	case "task":
 		if len(args) < 2 {
@@ -349,7 +349,7 @@ func CLI(ctx context.Context, args []string, stdout, stderr io.Writer) int {
 		detail := map[string]any{"code": contracts.ErrorCode(err), "message": err.Error()}
 		var typed *fault.Error
 		if errors.As(err, &typed) && typed.RequestID != "" {
-			detail["requestId"] = typed.RequestID
+			detail["request_id"] = typed.RequestID
 		}
 		body, encodeErr := json.Marshal(map[string]any{"error": detail})
 		if encodeErr != nil {

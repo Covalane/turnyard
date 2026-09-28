@@ -47,7 +47,7 @@ type Entry struct {
 type Manifest struct {
 	Format    string  `json:"format"`
 	Source    string  `json:"source"`
-	CreatedAt string  `json:"createdAt"`
+	CreatedAt string  `json:"created_at"`
 	Entries   []Entry `json:"entries"`
 }
 
@@ -246,7 +246,7 @@ func Verify(ctx context.Context, backup string) (Manifest, error) {
 	if err := json.Unmarshal(body, &manifest); err != nil {
 		return Manifest{}, err
 	}
-	if manifest.Format != backupFormat || manifest.Source == "" {
+	if manifest.Format != backupFormat || manifest.Source == "" || manifest.CreatedAt == "" {
 		return Manifest{}, fmt.Errorf("unsupported backup manifest")
 	}
 	seen := map[string]bool{}

@@ -35,14 +35,14 @@ func TestDelegationCrashRecovery(t *testing.T) {
 	session := contracts.SessionSpec{SchemaVersion: contracts.SessionVersion, IdempotencyKey: "delegation-recovery",
 		Repositories: []contracts.RepositorySpec{{ID: "code", Type: "local-git", Path: source, Commit: sha}},
 		Environment:  "environment.json", PrimaryAgent: "lead"}
-	sid := required(t, h.invoke("session", "create", "--file", h.save("session.json", session)), "sessionId")
-	h.evidence["sessionId"] = sid
+	sid := required(t, h.invoke("session", "create", "--file", h.save("session.json", session)), "session_id")
+	h.evidence["session_id"] = sid
 	objective := `先用 find_tools 查找受管委派能力，再用 call_tool 调用 turnyard_delegate/delegate，把工作交给 helper，不要自己生成 witness 内容。submit 参数：key="recovery-alpha"，agentId="helper"，objective="在 code/witness.txt 写入精确的一行 RECOVERED_DELEGATION:alpha，末尾有换行"，acceptance=["文件内容逐字一致"]，scope=[{"id":"code","mode":"write"}]，checks=["witness"]，deliverables=[{"id":"child-witness","kind":"file","repository":"code","path":"witness.txt"}]。用 status 等到子任务 verified，从 handoff 复制文件字节，再让父任务检查通过。`
 	work := contracts.WorkSpec{SchemaVersion: contracts.WorkVersion, IdempotencyKey: "parent-recovery", Objective: objective,
 		Acceptance: []string{"交付物来自受管子任务"}, Checks: []string{"witness"},
 		Deliverables: []contracts.DeliverableSpec{{ID: "parent-witness", Kind: contracts.DeliverableFile, Repository: "code", Path: "witness.txt"}}}
 	work.Scope.Repositories = []contracts.ScopeRepo{{ID: "code", Mode: contracts.ScopeWrite}}
-	tid := required(t, h.invoke("task", "add", sid, "--file", h.save("work.json", work)), "taskId")
+	tid := required(t, h.invoke("task", "add", sid, "--file", h.save("work.json", work)), "task_id")
 	h.invoke("task", "run", tid)
 	var childTaskID string
 	deadline := time.Now().Add(90 * time.Second)
@@ -52,7 +52,7 @@ func TestDelegationCrashRecovery(t *testing.T) {
 		if len(items) == 1 {
 			child, _ := items[0].(map[string]any)
 			if str(child, "status") == "running" {
-				childTaskID = required(t, child, "taskId")
+				childTaskID = required(t, child, "task_id")
 				break
 			}
 		}

@@ -20,7 +20,7 @@ const MaxModelCandidates = 64
 type MatcherConfig struct {
 	Endpoint      string `json:"endpoint"`
 	Model         string `json:"model"`
-	CredentialEnv string `json:"credentialEnv"`
+	CredentialEnv string `json:"credential_env"`
 }
 
 // LLMMatcher only ranks already granted tools. It never authorizes or calls

@@ -90,7 +90,7 @@ func ClientRequest(ctx context.Context, home string, req Request, start bool) (r
 		OK        bool           `json:"ok"`
 		Result    map[string]any `json:"result"`
 		Error     *fault.Error   `json:"error"`
-		RequestID string         `json:"requestId"`
+		RequestID string         `json:"request_id"`
 	}
 	if err := json.Unmarshal(line, &response); err != nil {
 		return nil, fault.Wrap(fault.CodeDaemonUnavailable, "decode supervisor response", err, "supervisor response is invalid")

@@ -40,13 +40,13 @@ go run ./examples/local-go \
   --commit-message 'feat: add health check'
 ```
 
-Review the generated model binding, check command, and expected outputs. To require a specific file, add `--deliverable` to the generator or edit `work.json`. Assign the returned `sessionId` and `taskId` to the variables below:
+Review the generated model binding, check command, and expected outputs. To require a specific file, add `--deliverable` to the generator or edit `work.json`. Assign the returned `session_id` and `task_id` to the variables below:
 
 ```sh
 bin/turnyard session create --file /tmp/turnyard-first-task/session.json
-SESSION_ID='paste the returned sessionId'
+SESSION_ID='paste the returned session_id'
 bin/turnyard task add "$SESSION_ID" --file /tmp/turnyard-first-task/work.json
-TASK_ID='paste the returned taskId'
+TASK_ID='paste the returned task_id'
 bin/turnyard task run "$TASK_ID"
 bin/turnyard task wait "$TASK_ID"
 bin/turnyard task show "$TASK_ID"
@@ -57,7 +57,7 @@ bin/turnyard session complete "$SESSION_ID"
 
 ## Configure the inputs
 
-[Session](../../internal/contracts/schemas/session.json) names optional pinned repositories and a creation `idempotencyKey`. [Environment](../../internal/contracts/schemas/environment.json) defines the sandbox, agents, model bindings, skills, native MCP servers or executable tools, checks, attachment host allowlists, and trusted byte-transfer connectors. Agents discover selected tools through one MCP gateway. [Work](../../internal/contracts/schemas/work.json) defines the objective, optional repository scope, acceptance criteria, checks, file inputs, and required outputs. Git work may specify a human-readable `commitMessage`; documents can run without a repository. Files and images may be handed off locally or through a configured connector. See [tool injection](tools.md) and [lifecycle and delivery](lifecycle.md) for the full contracts.
+[Session](../../internal/contracts/schemas/session.json) names optional pinned repositories and a creation `idempotency_key`. [Environment](../../internal/contracts/schemas/environment.json) defines the sandbox, agents, model bindings, skills, native MCP servers or executable tools, checks, attachment host allowlists, and trusted byte-transfer connectors. Agents discover selected tools through one MCP gateway. [Work](../../internal/contracts/schemas/work.json) defines the objective, optional repository scope, acceptance criteria, checks, file inputs, and required outputs. Git work may specify a human-readable `commit_message`; documents can run without a repository. Files and images may be handed off locally or through a configured connector. See [tool injection](tools.md) and [lifecycle and delivery](lifecycle.md) for the full contracts.
 
 The [local-go generator](local-go.md) pins the repository's current HEAD. For additional repositories, attachments, or non-Git output, edit the JSON contracts directly.
 
@@ -67,7 +67,7 @@ Use `session publish <session-id>` for explicitly enabled remote Git writes, `se
 
 The session and task commands start the local supervisor automatically if it is absent. Use `bin/turnyard daemon start`, `bin/turnyard daemon status`, and `bin/turnyard daemon stop` for explicit process control. `daemon stop` refuses to stop during active work. Turnyard does not include a service manager to restart the supervisor after a machine reboot.
 
-`session create` allows 10 minutes for repository preparation by default. Set `--timeout <seconds>` to change it, up to 7200 seconds. After a timeout, retry with the same `idempotencyKey` so Turnyard checks for an existing session first.
+`session create` allows 10 minutes for repository preparation by default. Set `--timeout <seconds>` to change it, up to 7200 seconds. After a timeout, retry with the same `idempotency_key` so Turnyard checks for an existing session first.
 
 ## Human input and recovery
 

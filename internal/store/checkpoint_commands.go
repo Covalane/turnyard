@@ -19,6 +19,6 @@ func (s *Store) SaveCheckpoint(ctx context.Context, in CheckpointRecord) error {
 		if err := create.Exec(ctx); err != nil {
 			return err
 		}
-		return addEvent(ctx, tx, in.SessionID, in.TaskID, lifecycle.EventCheckpointSaved, map[string]any{"checkpointId": in.ID, "sha256": in.SHA256})
+		return addEvent(ctx, tx, in.SessionID, in.TaskID, lifecycle.EventCheckpointSaved, map[string]any{"checkpoint_id": in.ID, "sha256": in.SHA256})
 	})
 }

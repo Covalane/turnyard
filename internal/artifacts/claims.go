@@ -15,7 +15,7 @@ const (
 )
 
 type claimDocument struct {
-	SchemaVersion string  `json:"schemaVersion"`
+	SchemaVersion string  `json:"schema_version"`
 	Artifacts     []Claim `json:"artifacts"`
 }
 

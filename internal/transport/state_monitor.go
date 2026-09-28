@@ -36,8 +36,8 @@ func (s *Supervisor) scanState(ctx context.Context, home string) {
 	warning := s.stateWarnBytes > 0 && bytes >= s.stateWarnBytes
 	previous := s.stateWarned.Swap(warning)
 	if warning && !previous {
-		observe.Log.WarnContext(ctx, "state usage exceeds warning threshold", "bytes", bytes, "thresholdBytes", s.stateWarnBytes)
+		observe.Log.WarnContext(ctx, "state usage exceeds warning threshold", "bytes", bytes, "threshold_bytes", s.stateWarnBytes)
 	} else if previous && !warning {
-		observe.Log.InfoContext(ctx, "state usage is below warning threshold", "bytes", bytes, "thresholdBytes", s.stateWarnBytes)
+		observe.Log.InfoContext(ctx, "state usage is below warning threshold", "bytes", bytes, "threshold_bytes", s.stateWarnBytes)
 	}
 }

@@ -57,10 +57,10 @@ type ToolGateway struct {
 	InvocationID string
 }
 type SandboxResult struct {
-	ExitCode int    `json:"exitCode"`
+	ExitCode int    `json:"exit_code"`
 	Output   string `json:"-"`
 	Stderr   string `json:"-"`
-	TimedOut bool   `json:"timedOut"`
+	TimedOut bool   `json:"timed_out"`
 	Backend  string `json:"backend"`
 }
 type OCIBackend struct{ dialect Dialect }

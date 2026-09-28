@@ -122,7 +122,7 @@ func (s *Service) createSession(ctx context.Context, session contracts.SessionSp
 		}
 		return sessionCreationResult(created), nil
 	}
-	observe.Log.InfoContext(ctx, "session created", "sessionId", sid, "backend", env.Sandbox.Backend, "isolation", env.Sandbox.Isolation, "imageDigest", env.Sandbox.ImageDigest, "repositoryCount", len(session.Repositories))
+	observe.Log.InfoContext(ctx, "session created", "session_id", sid, "backend", env.Sandbox.Backend, "isolation", env.Sandbox.Isolation, "image_digest", env.Sandbox.ImageDigest, "repository_count", len(session.Repositories))
 	return sessionCreationResult(created), nil
 }
 
@@ -217,7 +217,7 @@ func (s *Service) addTask(ctx context.Context, sid string, work contracts.WorkSp
 		}
 		return TaskAdditionResult{}, err
 	}
-	observe.Log.InfoContext(ctx, "task added", "sessionId", sid, "taskId", created.ID, "replayed", created.Replayed)
+	observe.Log.InfoContext(ctx, "task added", "session_id", sid, "task_id", created.ID, "replayed", created.Replayed)
 	return TaskAdditionResult{TaskID: created.ID, Status: created.Status, Replayed: created.Replayed}, nil
 }
 
@@ -259,7 +259,7 @@ func (s *Service) completeSession(ctx context.Context, sid string, handoffReady 
 	if err != nil {
 		return SessionCompletionResult{}, err
 	}
-	observe.Log.InfoContext(ctx, "session completed", "sessionId", sid, "completedAt", completedAt)
+	observe.Log.InfoContext(ctx, "session completed", "session_id", sid, "completed_at", completedAt)
 	return SessionCompletionResult{SchemaVersion: contracts.SessionCompletionVersion, SessionID: sid, Status: lifecycle.Completed, CompletedAt: completedAt, Deliveries: deliveries}, nil
 }
 
@@ -270,6 +270,6 @@ func (s *Service) CancelSession(ctx context.Context, sid, reason string) (Sessio
 	if err != nil {
 		return SessionCancellationResult{}, err
 	}
-	observe.Log.InfoContext(ctx, "session cancelled", "sessionId", sid, "cancelledAt", cancelledAt)
+	observe.Log.InfoContext(ctx, "session cancelled", "session_id", sid, "cancelled_at", cancelledAt)
 	return SessionCancellationResult{SchemaVersion: contracts.SessionCancellationVersion, SessionID: sid, Status: lifecycle.Cancelled, CancelledAt: cancelledAt, Reason: savedReason}, nil
 }

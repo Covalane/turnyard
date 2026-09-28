@@ -30,17 +30,17 @@ func DefaultCapacityLimits() CapacityLimits {
 }
 
 type CapacityStatus struct {
-	MaxTasks               int `json:"maxTasks"`
-	MaxCPUs                int `json:"maxCPUs"`
-	MaxMemoryMB            int `json:"maxMemoryMB"`
-	ActiveTasks            int `json:"activeTasks"`
-	ReservedCPUs           int `json:"reservedCPUs"`
-	ReservedMemoryMB       int `json:"reservedMemoryMB"`
-	WaitingTasks           int `json:"waitingTasks"`
-	MaxPreparations        int `json:"maxPreparations"`
-	MaxPendingPreparations int `json:"maxPendingPreparations"`
-	ActivePreparations     int `json:"activePreparations"`
-	WaitingPreparations    int `json:"waitingPreparations"`
+	MaxTasks               int `json:"max_tasks"`
+	MaxCPUs                int `json:"max_cpus"`
+	MaxMemoryMB            int `json:"max_memory_mb"`
+	ActiveTasks            int `json:"active_tasks"`
+	ReservedCPUs           int `json:"reserved_cpus"`
+	ReservedMemoryMB       int `json:"reserved_memory_mb"`
+	WaitingTasks           int `json:"waiting_tasks"`
+	MaxPreparations        int `json:"max_preparations"`
+	MaxPendingPreparations int `json:"max_pending_preparations"`
+	ActivePreparations     int `json:"active_preparations"`
+	WaitingPreparations    int `json:"waiting_preparations"`
 }
 
 type capacityWaiter struct {

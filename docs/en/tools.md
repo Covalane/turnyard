@@ -2,7 +2,7 @@
 
 [User guide](README.md) · [中文](../zh/tools.md)
 
-Turnyard separates the agent runtime, skills, tools, sandbox resources, and supervisor operations. `Environment` registers skills and tools; `agents[].skills` and `agents[].tools` select those made available to an agent. `Session.primaryAgent` pins the agent for the session. All four runtimes connect to one Turnyard MCP tool gateway, which connects only to the tools granted to that agent.
+Turnyard separates the agent runtime, skills, tools, sandbox resources, and supervisor operations. `Environment` registers skills and tools; `agents[].skills` and `agents[].tools` select those made available to an agent. `Session.primary_agent` pins the agent for the session. All four runtimes connect to one Turnyard MCP tool gateway, which connects only to the tools granted to that agent.
 
 ## Comparison with open-source implementations
 
@@ -19,10 +19,10 @@ At startup, the gateway connects to every backend granted to this agent and read
 The default matcher is local keyword search. Optionally, an OpenAI Chat-compatible model ranks **already granted tools** when keyword matches are weak or close. A model failure falls back to local search, unknown IDs from its response are discarded, and the model never executes a tool. Model ranking currently handles at most 64 granted tools; larger catalogs still use local search.
 
 ```json
-"toolSearch": {"mode": "llm-rerank", "modelBinding": "search-model"}
+"tool_search": {"mode": "llm-rerank", "model_binding": "search-model"}
 ```
 
-`search-model` must name a `modelBindings` entry with an OpenAI Chat endpoint. Omitting `toolSearch` selects local search. `network: "none"` cannot use model ranking.
+`search-model` must name a `model_bindings` entry with an OpenAI Chat endpoint. Omitting `tool_search` selects local search. `network: "none"` cannot use model ranking.
 
 ## Tool sources
 
@@ -33,7 +33,7 @@ The default matcher is local keyword search. Optionally, an OpenAI Chat-compatib
 
 The trusted environment pins an executable's `argv`, for example `['{toolDir}/stamp.sh']` or `['ossutil']`. The bridge starts the process directly; it **does not concatenate model arguments into a shell command**. `path` may point to a directory containing the executable and supporting files. Turnyard pins its digest and copies it to `/state/tools/<id>` for the session. `{toolDir}` resolves to that container directory. Programs already installed in the image need no `path`. The agent image must contain the bridge; this project's `Containerfile` includes it. Missing programs or a missing bridge fail the MCP connection or invocation.
 
-`passEnv` selects named values from the supervisor host; a missing value fails before invocation. In Docker `default` and `model-only` modes, tools run in an invocation-specific container. The agent container runs only an MCP proxy and does not receive tool credentials. In `model-only`, the agent remains on an internal network while the selected tool container can reach external services needed for its granted capability. Apple `container`, Podman, and `network: "none"` use an in-container gateway, where `passEnv` values are visible to the agent process and are not secret isolation. A bridged executable receives only base path variables and its declared `passEnv`. `timeoutSeconds` bounds a call; the bridge also bounds input, argument count, and output. A nonzero exit is a tool error. After an external write times out, inspect the external state before retrying.
+`pass_env` selects named values from the supervisor host; a missing value fails before invocation. In Docker `default` and `model-only` modes, tools run in an invocation-specific container. The agent container runs only an MCP proxy and does not receive tool credentials. In `model-only`, the agent remains on an internal network while the selected tool container can reach external services needed for its granted capability. Apple `container`, Podman, and `network: "none"` use an in-container gateway, where `pass_env` values are visible to the agent process and are not secret isolation. A bridged executable receives only base path variables and its declared `pass_env`. `timeout_seconds` bounds a call; the bridge also bounds input, argument count, and output. A nonzero exit is a tool error. After an external write times out, inspect the external state before retrying.
 
 The Docker tool container mounts only tool configuration, bundles, and separate tool state; it cannot read the agent's native session state, and the agent cannot see the catalog lock. There is currently no per-tool outbound domain allowlist; deployments must enforce any needed destination policy at the network layer.
 
@@ -45,24 +45,24 @@ Separate tool state and the catalog lock persist for the session but are not rol
 
 ```json
 {
-  "agents": [{"id": "lead", "runtime": "opencode", "modelBinding": "cloud", "tools": ["stamp_cli"]}],
+  "agents": [{"id": "lead", "runtime": "opencode", "model_binding": "cloud", "tools": ["stamp_cli"]}],
   "tools": [{
     "id": "stamp_cli", "kind": "executable",
     "description": "Generate a witness token from one value.",
     "path": "./examples/executable-witness",
     "argv": ["{toolDir}/stamp.sh"],
-    "passEnv": ["TURNYARD_EXEC_WITNESS_MODE"],
-    "timeoutSeconds": 30
+    "pass_env": ["TURNYARD_EXEC_WITNESS_MODE"],
+    "timeout_seconds": 30
   }]
 }
 ```
 
-The supervisor environment first provides `TURNYARD_EXEC_WITNESS_MODE=enabled`. The agent calls `find_tools`, then `call_tool` with `{"toolId":"stamp_cli/run","arguments":{"args":["alpha"]}}`. The bridge forwards the declared variable to the script, which returns `EXEC_WITNESS:alpha`; the agent writes it to the repository, and Turnyard independently checks the candidate. See [validation](validation.md) for real-model evidence. A complete Environment also needs sandbox and model bindings. Git policy is required only when the session includes repositories.
+The supervisor environment first provides `TURNYARD_EXEC_WITNESS_MODE=enabled`. The agent calls `find_tools`, then `call_tool` with `{"tool_id":"stamp_cli/run","arguments":{"args":["alpha"]}}`. The bridge forwards the declared variable to the script, which returns `EXEC_WITNESS:alpha`; the agent writes it to the repository, and Turnyard independently checks the candidate. See [validation](validation.md) for real-model evidence. A complete Environment also needs sandbox and model bindings. Git policy is required only when the session includes repositories.
 
-To offer `ossutil` to the agent, install it in the image and configure `kind: "executable"`, `argv: ["ossutil"]`, a useful description, and any needed `passEnv`. The model supplies subcommands through `run.args`. For a **required final deliverable**, prefer the [supervisor artifact connector](lifecycle.md): Turnyard uploads only after checks pass, then downloads and verifies the bytes. A real OSS bucket upload and two independent readbacks passed; cleanup of the test object failed because the current account lacks delete permission. See [validation](validation.md).
+To offer `ossutil` to the agent, install it in the image and configure `kind: "executable"`, `argv: ["ossutil"]`, a useful description, and any needed `pass_env`. The model supplies subcommands through `run.args`. For a **required final deliverable**, prefer the [supervisor artifact connector](lifecycle.md): Turnyard uploads only after checks pass, then downloads and verifies the bytes. A real OSS bucket upload and two independent readbacks passed; cleanup of the test object failed because the current account lacks delete permission. See [validation](validation.md).
 
 ## Skills, sandbox, and evidence
 
 A skill is guidance; it does not install a program by itself. The image's shell, language tools, allowed repository mounts, and sandbox-permitted network remain available to the agent. `agents[].tools` is not a system-call allowlist. Restrict file and network access through mounts, image contents, network policy, and credential configuration. Docker's `network: "model-only"` lets the agent call the selected cloud model through its own gateway while blocking direct public and host access; selected tools use their credentials in the separate tool gateway. `network: "none"` has no network and cannot directly call a cloud model. Trusted host-side connectors remain available for final delivery. Apple `container` and Podman currently reject `model-only` before execution.
 
-Turnyard records configured skills, gateway connection information, `find_tools`/`call_tool` activity observed in native events, actual backend IDs in gateway logs, and candidate checks. `configuredSkills` proves configuration only. Docker gateway logs sit beside the invocation log in a `.gateway.log` file. The gateway pins a catalog digest in the session, outside the agent-state checkpoint, on first start and fails if definitions drift on resume. New tool sources extend the gateway backend layer without a driver for each CLI program.
+Turnyard records configured skills, gateway connection information, `find_tools`/`call_tool` activity observed in native events, actual backend IDs in gateway logs, and candidate checks. `configured_skills` proves configuration only. Docker gateway logs sit beside the invocation log in a `.gateway.log` file. The gateway pins a catalog digest in the session, outside the agent-state checkpoint, on first start and fails if definitions drift on resume. New tool sources extend the gateway backend layer without a driver for each CLI program.

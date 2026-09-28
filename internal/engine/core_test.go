@@ -731,7 +731,7 @@ func TestGoScopeViolation(t *testing.T) {
 func TestGoRejectDuplicateJSONAndWrongSHA(t *testing.T) {
 	f := newFixture(t)
 	path := filepath.Join(f.root, "inputs", "duplicate.json")
-	_ = os.WriteFile(path, []byte(`{"idempotencyKey":"a","idempotencyKey":"b"}`), 0o600)
+	_ = os.WriteFile(path, []byte(`{"idempotency_key":"a","idempotency_key":"b"}`), 0o600)
 	var out map[string]any
 	if err := ReadJSON(path, "", &out); ErrorCode(err) != "INVALID_JSON" {
 		t.Fatalf("duplicate: %v", err)

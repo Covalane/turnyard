@@ -39,11 +39,11 @@ func TestToolGatewayKeepsCredentialOutsideAgent(t *testing.T) {
 	if err := os.WriteFile(filepath.Join(state, "tools", "secret_tool", "check.sh"), []byte(script), 0o700); err != nil {
 		t.Fatal(err)
 	}
-	bridgeConfig := `{"description":"Verify private tool credential","argv":["/state/tools/secret_tool/check.sh"],"passEnv":["TOOL_SECRET"]}`
+	bridgeConfig := `{"description":"Verify private tool credential","argv":["/state/tools/secret_tool/check.sh"],"pass_env":["TOOL_SECRET"]}`
 	if err := os.WriteFile(filepath.Join(state, "tool-config", "secret_tool.json"), []byte(bridgeConfig), 0o600); err != nil {
 		t.Fatal(err)
 	}
-	gatewayConfig := `{"backends":[{"id":"secret_tool","argv":["/usr/local/bin/turnyard-tool-bridge","--config","/state/tool-config/secret_tool.json"],"passEnv":["TOOL_SECRET"]}],"catalogLock":"/turnyard-catalog/lead.sha256"}`
+	gatewayConfig := `{"backends":[{"id":"secret_tool","argv":["/usr/local/bin/turnyard-tool-bridge","--config","/state/tool-config/secret_tool.json"],"pass_env":["TOOL_SECRET"]}],"catalog_lock":"/turnyard-catalog/lead.sha256"}`
 	configPath := filepath.Join(state, "tool-gateway", "lead.json")
 	if err := os.WriteFile(configPath, []byte(gatewayConfig), 0o600); err != nil {
 		t.Fatal(err)

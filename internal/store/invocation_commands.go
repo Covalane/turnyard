@@ -58,7 +58,7 @@ func (s *Store) StartInvocation(ctx context.Context, in StartInvocationInput) er
 			return err
 		}
 		return addEvent(ctx, tx, in.SessionID, in.TaskID, lifecycle.EventInvocationStarting, map[string]any{
-			"turnId": in.TurnID, "invocationId": in.InvocationID, "before": in.Before, "model": in.Model, "sandbox": in.SandboxBackend})
+			"turn_id": in.TurnID, "invocation_id": in.InvocationID, "before": in.Before, "model": in.Model, "sandbox": in.SandboxBackend})
 	})
 }
 
@@ -84,8 +84,8 @@ func (s *Store) FailInvocation(ctx context.Context, in InvocationFailure) error 
 			return err
 		}
 		return addEvent(ctx, tx, in.SessionID, in.TaskID, lifecycle.EventInvocationError, map[string]any{
-			"invocationId": in.InvocationID, "requestId": in.RequestID, "code": in.Code,
-			"agentAttempted": in.AgentAttempted, "message": in.Message})
+			"invocation_id": in.InvocationID, "request_id": in.RequestID, "code": in.Code,
+			"agent_attempted": in.AgentAttempted, "message": in.Message})
 	})
 }
 func (s *Store) FailPreflight(ctx context.Context, taskID, sessionID, expectedStatus, nextStatus string, code fault.Code) error {

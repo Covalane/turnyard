@@ -14,7 +14,7 @@ import (
 func TestClaimsAreInvocationScopedAndRejectEscapes(t *testing.T) {
 	state := t.TempDir()
 	path := filepath.Join(state, "artifacts.json")
-	if err := os.WriteFile(path, []byte(`{"schemaVersion":"turnyard.artifact-claims/v1","artifacts":[{"id":"answer","text":"hello"}]}`), 0o600); err != nil {
+	if err := os.WriteFile(path, []byte(`{"schema_version":"turnyard.artifact-claims/v1","artifacts":[{"id":"answer","text":"hello"}]}`), 0o600); err != nil {
 		t.Fatal(err)
 	}
 	claims, err := ReadClaims(state)
@@ -29,7 +29,7 @@ func TestClaimsAreInvocationScopedAndRejectEscapes(t *testing.T) {
 	if err != nil || len(missing) != 0 {
 		t.Fatalf("missing claim directory: %+v %v", missing, err)
 	}
-	if err := os.WriteFile(path, []byte(`{"schemaVersion":"turnyard.artifact-claims/v1","artifacts":[{"id":"a","text":"x"},{"id":"a","text":"y"}]}`), 0o600); err != nil {
+	if err := os.WriteFile(path, []byte(`{"schema_version":"turnyard.artifact-claims/v1","artifacts":[{"id":"a","text":"x"},{"id":"a","text":"y"}]}`), 0o600); err != nil {
 		t.Fatal(err)
 	}
 	if _, err := ReadClaims(state); err == nil {

@@ -17,26 +17,26 @@ type RepositorySpec struct {
 	Type    RepositorySourceType `json:"type"`
 	Path    string               `json:"path,omitempty"`
 	URL     string               `json:"url,omitempty"`
-	PushURL string               `json:"pushUrl,omitempty"`
+	PushURL string               `json:"push_url,omitempty"`
 	Commit  string               `json:"commit"`
 }
 
 // SessionSpec selects the repositories, environment, and primary agent.
 type SessionSpec struct {
-	SchemaVersion  string           `json:"schemaVersion"`
-	IdempotencyKey string           `json:"idempotencyKey"`
+	SchemaVersion  string           `json:"schema_version"`
+	IdempotencyKey string           `json:"idempotency_key"`
 	Repositories   []RepositorySpec `json:"repositories"`
 	Environment    string           `json:"environment"`
-	PrimaryAgent   string           `json:"primaryAgent"`
+	PrimaryAgent   string           `json:"primary_agent"`
 }
 
 // SandboxSpec selects a backend, image, and resource boundaries.
 type SandboxSpec struct {
 	Backend     string                  `json:"backend"`
 	Image       string                  `json:"image"`
-	ImageDigest string                  `json:"imageDigest,omitempty"`
+	ImageDigest string                  `json:"image_digest,omitempty"`
 	CPUs        int                     `json:"cpus,omitempty"`
-	MemoryMB    int                     `json:"memoryMB,omitempty"`
+	MemoryMB    int                     `json:"memory_mb,omitempty"`
 	Network     SandboxNetworkPolicy    `json:"network,omitempty"`
 	Isolation   SandboxIsolationProfile `json:"isolation,omitempty"`
 }
@@ -55,7 +55,7 @@ const (
 type AgentSpec struct {
 	ID           string   `json:"id"`
 	Runtime      string   `json:"runtime"`
-	ModelBinding string   `json:"modelBinding"`
+	ModelBinding string   `json:"model_binding"`
 	Skills       []string `json:"skills,omitempty"`
 	Tools        []string `json:"tools,omitempty"`
 	// Delegates lists agents this agent may launch as managed child sessions.
@@ -68,22 +68,22 @@ type ModelBinding struct {
 	ID            string `json:"id"`
 	Provider      string `json:"provider"`
 	Model         string `json:"model"`
-	CredentialEnv string `json:"credentialEnv"`
+	CredentialEnv string `json:"credential_env"`
 	// Endpoints is for a trusted, explicitly configured provider that is not
 	// in the built-in catalog. Only the transports a runtime uses are required.
 	Endpoints ModelEndpoints `json:"endpoints,omitzero"`
 }
 
 type ModelEndpoints struct {
-	OpenAIChat string `json:"openaiChat,omitempty"`
+	OpenAIChat string `json:"openai_chat,omitempty"`
 	Anthropic  string `json:"anthropic,omitempty"`
 	Responses  string `json:"responses,omitempty"`
 }
 
 // GitPolicy limits the repository writes Turnyard may perform.
 type GitPolicy struct {
-	LocalCommits bool                 `json:"localCommits"`
-	RemoteWrites GitRemoteWritePolicy `json:"remoteWrites"`
+	LocalCommits bool                 `json:"local_commits"`
+	RemoteWrites GitRemoteWritePolicy `json:"remote_writes"`
 }
 
 // GitRemoteWritePolicy controls whether Turnyard may publish feature branches.
@@ -99,14 +99,14 @@ type CheckSpec struct {
 	ID             string   `json:"id"`
 	Argv           []string `json:"argv"`
 	Repositories   []string `json:"repositories"`
-	TimeoutSeconds int      `json:"timeoutSeconds,omitempty"`
+	TimeoutSeconds int      `json:"timeout_seconds,omitempty"`
 }
 
 // BundleSpec identifies a skill bundle and its optional source digest.
 type BundleSpec struct {
 	ID           string `json:"id"`
 	Path         string `json:"path"`
-	SourceDigest string `json:"sourceDigest,omitempty"`
+	SourceDigest string `json:"source_digest,omitempty"`
 }
 
 // ToolSpec identifies a tool available for agent injection.
@@ -116,9 +116,9 @@ type ToolSpec struct {
 	Description    string   `json:"description,omitempty"`
 	Path           string   `json:"path,omitempty"`
 	Argv           []string `json:"argv"`
-	PassEnv        []string `json:"passEnv,omitempty"`
-	TimeoutSeconds int      `json:"timeoutSeconds,omitempty"`
-	SourceDigest   string   `json:"sourceDigest,omitempty"`
+	PassEnv        []string `json:"pass_env,omitempty"`
+	TimeoutSeconds int      `json:"timeout_seconds,omitempty"`
+	SourceDigest   string   `json:"source_digest,omitempty"`
 }
 
 type ToolKind string
@@ -134,7 +134,7 @@ const (
 // Search never authorizes or executes a tool.
 type ToolSearchSpec struct {
 	Mode         ToolSearchMode `json:"mode"`
-	ModelBinding string         `json:"modelBinding,omitempty"`
+	ModelBinding string         `json:"model_binding,omitempty"`
 }
 
 type ToolSearchMode string
@@ -146,28 +146,28 @@ const (
 
 // EnvironmentSpec defines the sandbox, agents, tools, and checks for a session.
 type EnvironmentSpec struct {
-	SchemaVersion      string                  `json:"schemaVersion"`
+	SchemaVersion      string                  `json:"schema_version"`
 	Sandbox            SandboxSpec             `json:"sandbox"`
 	Agents             []AgentSpec             `json:"agents"`
-	ModelBindings      []ModelBinding          `json:"modelBindings"`
+	ModelBindings      []ModelBinding          `json:"model_bindings"`
 	Git                GitPolicy               `json:"git,omitzero"`
 	Checks             []CheckSpec             `json:"checks,omitempty"`
 	Skills             []BundleSpec            `json:"skills,omitempty"`
 	Tools              []ToolSpec              `json:"tools,omitempty"`
-	ToolSearch         *ToolSearchSpec         `json:"toolSearch,omitempty"`
-	ArtifactConnectors []ArtifactConnectorSpec `json:"artifactConnectors,omitempty"`
-	InputHosts         []string                `json:"inputHosts,omitempty"`
+	ToolSearch         *ToolSearchSpec         `json:"tool_search,omitempty"`
+	ArtifactConnectors []ArtifactConnectorSpec `json:"artifact_connectors,omitempty"`
+	InputHosts         []string                `json:"input_hosts,omitempty"`
 }
 
 // ArtifactConnectorSpec is a trusted host-side byte transport. Work may only
 // select one of these preconfigured commands and a URI under its prefix.
 type ArtifactConnectorSpec struct {
 	ID             string   `json:"id"`
-	URIPrefix      string   `json:"uriPrefix"`
-	GetArgv        []string `json:"getArgv"`
-	PutArgv        []string `json:"putArgv,omitempty"`
-	PassEnv        []string `json:"passEnv,omitempty"`
-	TimeoutSeconds int      `json:"timeoutSeconds,omitempty"`
+	URIPrefix      string   `json:"uri_prefix"`
+	GetArgv        []string `json:"get_argv"`
+	PutArgv        []string `json:"put_argv,omitempty"`
+	PassEnv        []string `json:"pass_env,omitempty"`
+	TimeoutSeconds int      `json:"timeout_seconds,omitempty"`
 }
 
 // ScopeRepo grants one task read or write access to a session repository.
@@ -187,15 +187,15 @@ const (
 
 // WorkSpec states one task's objective, scope, checks, and required outputs.
 type WorkSpec struct {
-	SchemaVersion  string `json:"schemaVersion"`
-	IdempotencyKey string `json:"idempotencyKey"`
+	SchemaVersion  string `json:"schema_version"`
+	IdempotencyKey string `json:"idempotency_key"`
 	// RequestDigest is supervisor-owned. It lets a retried task add return its
 	// original result without fetching a potentially expired signed URL again.
-	RequestDigest string `json:"requestDigest,omitempty"`
+	RequestDigest string `json:"request_digest,omitempty"`
 	Objective     string `json:"objective"`
 	// CommitMessage is the human-readable first line of the Git commit. When
 	// omitted, Turnyard derives a short title from Objective for older inputs.
-	CommitMessage string `json:"commitMessage,omitempty"`
+	CommitMessage string `json:"commit_message,omitempty"`
 	Scope         struct {
 		Repositories []ScopeRepo `json:"repositories"`
 	} `json:"scope"`
@@ -210,8 +210,8 @@ type WorkSpec struct {
 type InputSpec struct {
 	ID             string      `json:"id"`
 	Source         InputSource `json:"source"`
-	ExpectedSHA256 string      `json:"expectedSha256,omitempty"`
-	MediaType      string      `json:"mediaType,omitempty"`
+	ExpectedSHA256 string      `json:"expected_sha256,omitempty"`
+	MediaType      string      `json:"media_type,omitempty"`
 }
 
 type InputSource struct {
@@ -237,8 +237,8 @@ type DeliverableSpec struct {
 	Repository     string           `json:"repository,omitempty"`
 	Path           string           `json:"path,omitempty"`
 	Kind           DeliverableKind  `json:"kind"`
-	ExpectedSHA256 string           `json:"expectedSha256,omitempty"`
-	MediaType      string           `json:"mediaType,omitempty"`
+	ExpectedSHA256 string           `json:"expected_sha256,omitempty"`
+	MediaType      string           `json:"media_type,omitempty"`
 	Base           string           `json:"base,omitempty"`
 	Destination    *DestinationSpec `json:"destination,omitempty"`
 }

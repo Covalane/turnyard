@@ -8,14 +8,14 @@ import (
 
 func TestGitPolicyIsRequiredOnlyForRepositorySessions(t *testing.T) {
 	dir := t.TempDir()
-	environment := `{"schemaVersion":"turnyard.environment/v1","sandbox":{"backend":"docker","image":"agent:test"},"agents":[{"id":"lead","runtime":"opencode","modelBinding":"cloud"}],"modelBindings":[{"id":"cloud","provider":"ollama-cloud","model":"test","credentialEnv":"OLLAMA_API_KEY"}]}`
+	environment := `{"schema_version":"turnyard.environment/v1","sandbox":{"backend":"docker","image":"agent:test"},"agents":[{"id":"lead","runtime":"opencode","model_binding":"cloud"}],"model_bindings":[{"id":"cloud","provider":"ollama-cloud","model":"test","credential_env":"OLLAMA_API_KEY"}]}`
 	if err := os.WriteFile(filepath.Join(dir, "environment.json"), []byte(environment), 0o600); err != nil {
 		t.Fatal(err)
 	}
 	path := filepath.Join(dir, "session.json")
 	writeSession := func(repositories string) {
 		t.Helper()
-		body := `{"schemaVersion":"turnyard.session/v1","idempotencyKey":"test","repositories":` + repositories + `,"environment":"environment.json","primaryAgent":"lead"}`
+		body := `{"schema_version":"turnyard.session/v1","idempotency_key":"test","repositories":` + repositories + `,"environment":"environment.json","primary_agent":"lead"}`
 		if err := os.WriteFile(path, []byte(body), 0o600); err != nil {
 			t.Fatal(err)
 		}
@@ -32,12 +32,12 @@ func TestGitPolicyIsRequiredOnlyForRepositorySessions(t *testing.T) {
 
 func TestLoadSessionRejectsInvalidCustomModelEndpoint(t *testing.T) {
 	dir := t.TempDir()
-	session := `{"schemaVersion":"turnyard.session/v1","idempotencyKey":"model","repositories":[],"environment":"environment.json","primaryAgent":"lead"}`
+	session := `{"schema_version":"turnyard.session/v1","idempotency_key":"model","repositories":[],"environment":"environment.json","primary_agent":"lead"}`
 	if err := os.WriteFile(filepath.Join(dir, "session.json"), []byte(session), 0o600); err != nil {
 		t.Fatal(err)
 	}
 	for _, endpoint := range []string{"http://models.example.test/v1", "https://user:secret@models.example.test/v1", "https://models.example.test/v1?token=x"} {
-		env := `{"schemaVersion":"turnyard.environment/v1","sandbox":{"backend":"docker","image":"agent:test"},"agents":[{"id":"lead","runtime":"opencode","modelBinding":"cloud"}],"modelBindings":[{"id":"cloud","provider":"custom","model":"test","credentialEnv":"CUSTOM_API_KEY","endpoints":{"openaiChat":"` + endpoint + `"}}]}`
+		env := `{"schema_version":"turnyard.environment/v1","sandbox":{"backend":"docker","image":"agent:test"},"agents":[{"id":"lead","runtime":"opencode","model_binding":"cloud"}],"model_bindings":[{"id":"cloud","provider":"custom","model":"test","credential_env":"CUSTOM_API_KEY","endpoints":{"openai_chat":"` + endpoint + `"}}]}`
 		if err := os.WriteFile(filepath.Join(dir, "environment.json"), []byte(env), 0o600); err != nil {
 			t.Fatal(err)
 		}
@@ -49,8 +49,8 @@ func TestLoadSessionRejectsInvalidCustomModelEndpoint(t *testing.T) {
 
 func TestLoadSessionKeepsSandboxIsolationProfile(t *testing.T) {
 	dir := t.TempDir()
-	session := `{"schemaVersion":"turnyard.session/v1","idempotencyKey":"isolation","repositories":[],"environment":"environment.json","primaryAgent":"lead"}`
-	environment := `{"schemaVersion":"turnyard.environment/v1","sandbox":{"backend":"docker","image":"agent:test","isolation":"gvisor","network":"model-only"},"agents":[{"id":"lead","runtime":"opencode","modelBinding":"cloud"}],"modelBindings":[{"id":"cloud","provider":"ollama-cloud","model":"test","credentialEnv":"OLLAMA_API_KEY"}]}`
+	session := `{"schema_version":"turnyard.session/v1","idempotency_key":"isolation","repositories":[],"environment":"environment.json","primary_agent":"lead"}`
+	environment := `{"schema_version":"turnyard.environment/v1","sandbox":{"backend":"docker","image":"agent:test","isolation":"gvisor","network":"model-only"},"agents":[{"id":"lead","runtime":"opencode","model_binding":"cloud"}],"model_bindings":[{"id":"cloud","provider":"ollama-cloud","model":"test","credential_env":"OLLAMA_API_KEY"}]}`
 	if err := os.WriteFile(filepath.Join(dir, "session.json"), []byte(session), 0o600); err != nil {
 		t.Fatal(err)
 	}

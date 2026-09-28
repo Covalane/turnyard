@@ -56,23 +56,23 @@ func (h correlationHandler) Handle(ctx context.Context, record slog.Record) erro
 	present := map[string]bool{}
 	record.Attrs(func(attr slog.Attr) bool { present[attr.Key] = true; return true })
 	if ids.RequestID != "" {
-		if !present["requestId"] {
-			record.AddAttrs(slog.String("requestId", ids.RequestID))
+		if !present["request_id"] {
+			record.AddAttrs(slog.String("request_id", ids.RequestID))
 		}
 	}
 	if ids.SessionID != "" {
-		if !present["sessionId"] {
-			record.AddAttrs(slog.String("sessionId", ids.SessionID))
+		if !present["session_id"] {
+			record.AddAttrs(slog.String("session_id", ids.SessionID))
 		}
 	}
 	if ids.TaskID != "" {
-		if !present["taskId"] {
-			record.AddAttrs(slog.String("taskId", ids.TaskID))
+		if !present["task_id"] {
+			record.AddAttrs(slog.String("task_id", ids.TaskID))
 		}
 	}
 	if ids.InvocationID != "" {
-		if !present["invocationId"] {
-			record.AddAttrs(slog.String("invocationId", ids.InvocationID))
+		if !present["invocation_id"] {
+			record.AddAttrs(slog.String("invocation_id", ids.InvocationID))
 		}
 	}
 	return h.Handler.Handle(ctx, record)
@@ -90,17 +90,17 @@ var Log = slog.New(correlationHandler{slog.NewJSONHandler(os.Stderr, nil)})
 // error messages or subprocess output into the operational log.
 func LogFailure(ctx context.Context, message string, err error, attrs ...any) {
 	fields := []any{"code", fault.CodeOf(err), "origin", fault.Origin(err), "sites", fault.Sites(err),
-		"operations", fault.Operations(err), "causeType", fault.CauseType(err)}
+		"operations", fault.Operations(err), "cause_type", fault.CauseType(err)}
 	var exit *exec.ExitError
 	if errors.As(err, &exit) {
-		fields = append(fields, "exitCode", exit.ExitCode())
+		fields = append(fields, "exit_code", exit.ExitCode())
 	}
 	var errno syscall.Errno
 	if errors.As(err, &errno) {
 		fields = append(fields, "errno", int(errno))
 	}
 	if errors.Is(err, context.DeadlineExceeded) {
-		fields = append(fields, "deadlineExceeded", true)
+		fields = append(fields, "deadline_exceeded", true)
 	} else if errors.Is(err, context.Canceled) {
 		fields = append(fields, "cancelled", true)
 	}

@@ -125,15 +125,15 @@ func (s *Service) invokeAgent(ctx context.Context, input turnExecution, agentAtt
 		return agents.AgentResult{}, err
 	}
 	err = s.Store.CompleteAgent(ctx, input.task.SessionID, input.task.ID, input.invocationID, result.NativeID,
-		map[string]any{"nativeId": result.NativeID, "eventCount": len(result.Events), "needsInput": result.NeedsInput,
-			"actualProvider": result.ActualProvider, "actualModel": result.ActualModel,
-			"configuredSkills": input.agent.Skills, "connectedTools": result.ConnectedTools,
-			"loadedSkills": result.LoadedSkills, "calledTools": result.CalledTools})
+		map[string]any{"native_id": result.NativeID, "event_count": len(result.Events), "needs_input": result.NeedsInput,
+			"actual_provider": result.ActualProvider, "actual_model": result.ActualModel,
+			"configured_skills": input.agent.Skills, "connected_tools": result.ConnectedTools,
+			"loaded_skills": result.LoadedSkills, "called_tools": result.CalledTools})
 	if err != nil {
 		return agents.AgentResult{}, err
 	}
-	observe.Log.InfoContext(ctx, "agent completed", "sessionId", input.task.SessionID, "taskId", input.task.ID,
-		"invocationId", input.invocationID, "runtime", input.agent.Runtime, "nativeId", result.NativeID,
+	observe.Log.InfoContext(ctx, "agent completed", "session_id", input.task.SessionID, "task_id", input.task.ID,
+		"invocation_id", input.invocationID, "runtime", input.agent.Runtime, "native_id", result.NativeID,
 		"provider", result.ActualProvider, "model", result.ActualModel)
 	return result, nil
 }
@@ -203,8 +203,8 @@ func (s *Service) finalizeTurn(ctx context.Context, input turnExecution, bases, 
 	}); err != nil {
 		return TaskRunResult{}, err
 	}
-	observe.Log.InfoContext(ctx, "candidate finalized", "sessionId", input.task.SessionID, "taskId", input.task.ID,
-		"candidateId", candidateID, "digest", digest, "status", status)
+	observe.Log.InfoContext(ctx, "candidate finalized", "session_id", input.task.SessionID, "task_id", input.task.ID,
+		"candidate_id", candidateID, "digest", digest, "status", status)
 	return TaskRunResult{TaskID: input.task.ID, Status: status, CandidateID: candidateID,
 		CandidateDigest: digest, CheckpointID: checkpointID, Checks: checks,
 		Deliverables: deliverables, NeedsInput: agentResult.NeedsInput,
@@ -242,17 +242,17 @@ func (s *Service) deliverOutputs(ctx context.Context, sid, tid string, env contr
 		if spec.Destination == nil || spec.Destination.Kind != contracts.DestinationConnector || results[i].Status != artifacts.StatusPresent {
 			continue
 		}
-		intent := map[string]any{"deliverableId": spec.ID, "connector": spec.Destination.Connector,
-			"uriDigest": contracts.Digest(spec.Destination.URI), "sha256": results[i].SHA256}
+		intent := map[string]any{"deliverable_id": spec.ID, "connector": spec.Destination.Connector,
+			"uri_digest": contracts.Digest(spec.Destination.URI), "sha256": results[i].SHA256}
 		if err := s.Store.AppendEvent(ctx, sid, tid, lifecycle.EventArtifactDeliveryIntent, intent); err != nil {
 			return nil, err
 		}
 		results[i] = artifacts.DeliverConnector(ctx, env, spec, results[i])
 		if err := s.Store.AppendEvent(ctx, sid, tid, lifecycle.EventArtifactDeliveryResult,
-			map[string]any{"deliverableId": spec.ID, "status": results[i].Status, "sha256": results[i].SHA256}); err != nil {
+			map[string]any{"deliverable_id": spec.ID, "status": results[i].Status, "sha256": results[i].SHA256}); err != nil {
 			return nil, err
 		}
-		observe.Log.InfoContext(ctx, "artifact delivery completed", "taskId", tid, "deliverableId", spec.ID, "status", results[i].Status)
+		observe.Log.InfoContext(ctx, "artifact delivery completed", "task_id", tid, "deliverable_id", spec.ID, "status", results[i].Status)
 	}
 	return results, nil
 }

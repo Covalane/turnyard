@@ -71,6 +71,10 @@ func TestSearchCallAndCatalogDrift(t *testing.T) {
 	if err != nil || len(found.Tools) != 1 || found.Tools[0].ID != "allowed/echo" || found.Tools[0].InputSchema == nil {
 		t.Fatalf("search did not return an authorized tool and schema: %+v %v", found, err)
 	}
+	encoded, err := json.Marshal(found)
+	if err != nil || !strings.Contains(string(encoded), `"input_schema"`) {
+		t.Fatalf("search result did not use the Turnyard JSON field name: %s %v", encoded, err)
+	}
 	if _, err := gateway.Call(ctx, "ungranted/echo", map[string]any{"value": "hello"}); err == nil || !strings.Contains(err.Error(), "not granted") {
 		t.Fatalf("ungranted tool call was accepted: %v", err)
 	}

@@ -27,16 +27,16 @@ var delegationFilePattern = regexp.MustCompile(`^[a-f0-9]{32}\.json$`)
 type delegationRequest struct {
 	Action         contracts.DelegationAction  `json:"action"`
 	Key            string                      `json:"key"`
-	AgentID        string                      `json:"agentId,omitempty"`
+	AgentID        string                      `json:"agent_id,omitempty"`
 	Objective      string                      `json:"objective,omitempty"`
 	Acceptance     []string                    `json:"acceptance,omitempty"`
 	Scope          []contracts.ScopeRepo       `json:"scope,omitempty"`
 	Checks         []string                    `json:"checks,omitempty"`
 	Deliverables   []contracts.DeliverableSpec `json:"deliverables,omitempty"`
-	InputIDs       []string                    `json:"inputIds,omitempty"`
+	InputIDs       []string                    `json:"input_ids,omitempty"`
 	Reply          string                      `json:"reply,omitempty"`
 	Retry          bool                        `json:"retry,omitempty"`
-	TimeoutSeconds int                         `json:"timeoutSeconds,omitempty"`
+	TimeoutSeconds int                         `json:"timeout_seconds,omitempty"`
 }
 
 type delegationResponse struct {
@@ -215,8 +215,8 @@ func (d *delegationServer) submit(ctx context.Context, key string, req delegatio
 	if added.Status == lifecycle.Queued {
 		d.runChild(added.TaskID, "", false, req.TimeoutSeconds)
 	}
-	observe.Log.InfoContext(ctx, "delegation submitted", "parentTaskId", d.parent.task.ID,
-		"childSessionId", created.SessionID, "childTaskId", added.TaskID, "agentId", childAgent.ID)
+	observe.Log.InfoContext(ctx, "delegation submitted", "parent_task_id", d.parent.task.ID,
+		"child_session_id", created.SessionID, "child_task_id", added.TaskID, "agent_id", childAgent.ID)
 	return d.status(ctx, key)
 }
 
@@ -285,9 +285,9 @@ func (d *delegationServer) status(ctx context.Context, key string) (any, error) 
 	if err != nil {
 		return nil, err
 	}
-	result := map[string]any{"delegationId": childSession.ID, "agentId": childSession.DelegateAgentID.Value,
-		"sessionId": childSession.ID, "taskId": childTask.ID, "status": childTask.Status,
-		"errorCode": childTask.ErrorCode.Value}
+	result := map[string]any{"delegation_id": childSession.ID, "agent_id": childSession.DelegateAgentID.Value,
+		"session_id": childSession.ID, "task_id": childTask.ID, "status": childTask.Status,
+		"error_code": childTask.ErrorCode.Value}
 	if childTask.CandidateID.Present {
 		taskResult, err := d.service.TaskResult(ctx, childTask.ID)
 		if err != nil {
@@ -302,12 +302,12 @@ func (d *delegationServer) status(ctx context.Context, key string) (any, error) 
 						return nil, failErr
 					}
 					result["status"] = lifecycle.Failed
-					result["errorCode"] = fault.CodeHandoffUnavailable
+					result["error_code"] = fault.CodeHandoffUnavailable
 					taskResult.Candidate.Status = lifecycle.Failed
 				} else {
 					result["status"] = DelegationHandoffUnavailable
 				}
-				result["handoffError"] = err.Error()
+				result["handoff_error"] = err.Error()
 			} else {
 				result["handoff"] = handoff
 				if childSession.Status != lifecycle.Completed {

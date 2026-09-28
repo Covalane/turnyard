@@ -31,11 +31,11 @@ Linux Docker 可在可信的 Environment 中设置 `"sandbox":{"backend":"docker
 
 ## 输入
 
-`Session.repositories` 逐个给出本机仓库根目录或远端仓库 URL，以及固定的 40 位 commit SHA；`primaryAgent` 选择该会话的代理。`idempotencyKey` 标识一次会话创建：超时或响应丢失后，用相同文件重试会返回同一会话；同一键对应不同输入会报冲突。要创建独立的新会话，应使用新键。会话一旦创建，任务会继续使用同一个原生运行时会话，不跨运行时迁移。远端配置见 [Git 工作流](git.md)。
+`Session.repositories` 逐个给出本机仓库根目录或远端仓库 URL，以及固定的 40 位 commit SHA；`primary_agent` 选择该会话的代理。`idempotency_key` 标识一次会话创建：超时或响应丢失后，用相同文件重试会返回同一会话；同一键对应不同输入会报冲突。要创建独立的新会话，应使用新键。会话一旦创建，任务会继续使用同一个原生运行时会话，不跨运行时迁移。远端配置见 [Git 工作流](git.md)。
 
-`Environment.agents` 将代理 ID 绑定到运行时和 `modelBinding`。目前验证过的组合：OpenCode + Ollama Cloud/DeepSeek、Kimi Code + Ollama Cloud、Claude Code + DeepSeek、Codex CLI + DeepSeek。其中 OpenCode + DeepSeek 仅通过单任务工具调用链路，尚未完成多任务验证。内置提供方的端点和凭据要求集中管理；其他兼容提供方可显式配置 HTTPS `endpoints`。OpenCode + OpenAI 和 Kimi + DeepSeek/OpenAI 尚未完成真实链路验证。Skill、原生 MCP 服务和普通可执行工具由环境声明，再由代理 ID 选择；工具通过一个 MCP 网关按需发现，来源目录会锁定摘要，后续改变会触发环境漂移错误。见[代理能力与工具注入](tools.md)。
+`Environment.agents` 将代理 ID 绑定到运行时和 `model_binding`。目前验证过的组合：OpenCode + Ollama Cloud/DeepSeek、Kimi Code + Ollama Cloud、Claude Code + DeepSeek、Codex CLI + DeepSeek。其中 OpenCode + DeepSeek 仅通过单任务工具调用链路，尚未完成多任务验证。内置提供方的端点和凭据要求集中管理；其他兼容提供方可显式配置 HTTPS `endpoints`。OpenCode + OpenAI 和 Kimi + DeepSeek/OpenAI 尚未完成真实链路验证。Skill、原生 MCP 服务和普通可执行工具由环境声明，再由代理 ID 选择；工具通过一个 MCP 网关按需发现，来源目录会锁定摘要，后续改变会触发环境漂移错误。见[代理能力与工具注入](tools.md)。
 
-`Work.scope.repositories` 按仓库设置 `read` 或 `write`；不修改代码的文档任务可使用空仓库列表。`inputs` 可附带本机文件、允许域名的 HTTPS 文件或连接器文件，任务接受前会固定实际字节。`deliverables` 声明必需产出物；文件和图片可从 Git 候选版本交付，也可从专用产出目录交付到本地或配置的对象存储。`acceptance` 写明验收目标；`checks` 引用环境中预先定义的命令。`commitMessage` 可指定 Git 提交标题；未填写时从任务目标提取短标题，任务 ID 放在提交正文中。完整输入、交付配置和结果说明见[生命周期、交付与存储](lifecycle.md)。
+`Work.scope.repositories` 按仓库设置 `read` 或 `write`；不修改代码的文档任务可使用空仓库列表。`inputs` 可附带本机文件、允许域名的 HTTPS 文件或连接器文件，任务接受前会固定实际字节。`deliverables` 声明必需产出物；文件和图片可从 Git 候选版本交付，也可从专用产出目录交付到本地或配置的对象存储。`acceptance` 写明验收目标；`checks` 引用环境中预先定义的命令。`commit_message` 可指定 Git 提交标题；未填写时从任务目标提取短标题，任务 ID 放在提交正文中。完整输入、交付配置和结果说明见[生命周期、交付与存储](lifecycle.md)。
 
 如已有本机 Go 仓库，可用 [local-go 示例](local-go.md)根据当前 HEAD 生成三份有效 JSON，再修改目标、检查和交付物要求。
 
@@ -54,7 +54,7 @@ bin/turnyard session complete <session-id>
 
 上述命令发现本机 supervisor 尚未运行时会自动启动它。需要显式管理进程时，可用 `bin/turnyard daemon start`、`bin/turnyard daemon status`、`bin/turnyard daemon stop`。`task run` 接受任务后即返回，supervisor 在后台继续执行；`task wait` 轮询至任务停止。有活动任务时 `daemon stop` 会拒绝关闭。Turnyard 尚无内置的开机自动重启服务管理器。
 
-`session create` 默认允许 10 分钟准备仓库，可用 `--timeout <秒>` 调整，最大为 7200 秒。超时后用相同 `idempotencyKey` 重试，先查询已有会话，再决定是否重新准备。
+`session create` 默认允许 10 分钟准备仓库，可用 `--timeout <秒>` 调整，最大为 7200 秒。超时后用相同 `idempotency_key` 重试，先查询已有会话，再决定是否重新准备。
 
 ## 人工介入与恢复
 

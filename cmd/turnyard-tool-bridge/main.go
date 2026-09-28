@@ -23,8 +23,8 @@ const maxOutputBytes = 256 << 10
 type toolConfig struct {
 	Description    string   `json:"description"`
 	Argv           []string `json:"argv"`
-	PassEnv        []string `json:"passEnv,omitempty"`
-	TimeoutSeconds int      `json:"timeoutSeconds,omitempty"`
+	PassEnv        []string `json:"pass_env,omitempty"`
+	TimeoutSeconds int      `json:"timeout_seconds,omitempty"`
 }
 
 type request struct {

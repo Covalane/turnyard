@@ -2,53 +2,53 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "type": "object",
   "additionalProperties": false,
-  "required": ["schemaVersion", "sandbox", "agents", "modelBindings"],
+  "required": ["schema_version", "sandbox", "agents", "model_bindings"],
   "properties": {
-    "schemaVersion": {"const": "turnyard.environment/v1"},
+    "schema_version": {"const": "turnyard.environment/v1"},
     "sandbox": {"type": "object", "additionalProperties": false, "required": ["backend", "image"], "properties": {
       "backend": {"type": "string", "pattern": "^[a-z][a-z0-9_-]{0,39}$"},
       "image": {"type": "string", "minLength": 1},
       "cpus": {"type": "integer", "minimum": 1, "maximum": 16},
-      "memoryMB": {"type": "integer", "minimum": 256, "maximum": 32768},
+      "memory_mb": {"type": "integer", "minimum": 256, "maximum": 32768},
       "network": {"enum": ["default", "none", "model-only"]},
       "isolation": {"type": "string", "pattern": "^[a-z][a-z0-9_-]{0,39}$"}
     }},
     "agents": {"type": "array", "minItems": 1, "items": {"type": "object", "additionalProperties": false,
-      "required": ["id", "runtime", "modelBinding"], "properties": {
+      "required": ["id", "runtime", "model_binding"], "properties": {
         "id": {"type": "string", "pattern": "^[a-z][a-z0-9_-]{0,39}$"},
-        "runtime": {"type": "string", "pattern": "^[a-z][a-z0-9_-]{0,39}$"}, "modelBinding": {"type": "string", "minLength": 1},
+        "runtime": {"type": "string", "pattern": "^[a-z][a-z0-9_-]{0,39}$"}, "model_binding": {"type": "string", "minLength": 1},
         "skills": {"type": "array", "items": {"type": "string"}, "uniqueItems": true},
         "tools": {"type": "array", "items": {"type": "string"}, "uniqueItems": true},
         "delegates": {"type": "array", "items": {"type": "string", "pattern": "^[a-z][a-z0-9_-]{0,39}$"}, "uniqueItems": true}
       }}},
-    "modelBindings": {"type": "array", "minItems": 1, "items": {"type": "object", "additionalProperties": false,
-      "required": ["id", "provider", "model", "credentialEnv"], "properties": {
+    "model_bindings": {"type": "array", "minItems": 1, "items": {"type": "object", "additionalProperties": false,
+      "required": ["id", "provider", "model", "credential_env"], "properties": {
         "id": {"type": "string", "pattern": "^[a-z][a-z0-9_-]{0,39}$"}, "provider": {"type": "string", "pattern": "^[a-z][a-z0-9_-]{0,39}$"},
-        "model": {"type": "string", "minLength": 1}, "credentialEnv": {"type": "string", "pattern": "^[A-Z][A-Z0-9_]{0,79}$"},
+        "model": {"type": "string", "minLength": 1}, "credential_env": {"type": "string", "pattern": "^[A-Z][A-Z0-9_]{0,79}$"},
         "endpoints": {"type": "object", "additionalProperties": false, "minProperties": 1, "properties": {
-          "openaiChat": {"type": "string", "minLength": 1}, "anthropic": {"type": "string", "minLength": 1},
+          "openai_chat": {"type": "string", "minLength": 1}, "anthropic": {"type": "string", "minLength": 1},
           "responses": {"type": "string", "minLength": 1}
         }}
       }}},
-    "git": {"type": "object", "additionalProperties": false, "required": ["localCommits", "remoteWrites"], "properties": {
-      "localCommits": {"const": true}, "remoteWrites": {"enum": ["none", "push"]}
+    "git": {"type": "object", "additionalProperties": false, "required": ["local_commits", "remote_writes"], "properties": {
+      "local_commits": {"const": true}, "remote_writes": {"enum": ["none", "push"]}
     }},
-    "inputHosts": {"type": "array", "items": {"type": "string", "minLength": 1}, "uniqueItems": true},
-    "artifactConnectors": {"type": "array", "items": {"type": "object", "additionalProperties": false,
-      "required": ["id", "uriPrefix", "getArgv"], "properties": {
+    "input_hosts": {"type": "array", "items": {"type": "string", "minLength": 1}, "uniqueItems": true},
+    "artifact_connectors": {"type": "array", "items": {"type": "object", "additionalProperties": false,
+      "required": ["id", "uri_prefix", "get_argv"], "properties": {
         "id": {"type": "string", "pattern": "^[a-z][a-z0-9_-]{0,39}$"},
-        "uriPrefix": {"type": "string", "minLength": 4},
-        "getArgv": {"type": "array", "minItems": 1, "items": {"type": "string"}},
-        "putArgv": {"type": "array", "minItems": 1, "items": {"type": "string"}},
-        "passEnv": {"type": "array", "items": {"type": "string", "pattern": "^[A-Z][A-Z0-9_]{0,127}$"}, "uniqueItems": true},
-        "timeoutSeconds": {"type": "integer", "minimum": 1, "maximum": 3600}
+        "uri_prefix": {"type": "string", "minLength": 4},
+        "get_argv": {"type": "array", "minItems": 1, "items": {"type": "string"}},
+        "put_argv": {"type": "array", "minItems": 1, "items": {"type": "string"}},
+        "pass_env": {"type": "array", "items": {"type": "string", "pattern": "^[A-Z][A-Z0-9_]{0,127}$"}, "uniqueItems": true},
+        "timeout_seconds": {"type": "integer", "minimum": 1, "maximum": 3600}
       }}},
     "checks": {"type": "array", "items": {"type": "object", "additionalProperties": false,
       "required": ["id", "argv", "repositories"], "properties": {
         "id": {"type": "string", "pattern": "^[a-z][a-z0-9_-]{0,39}$"},
         "argv": {"type": "array", "minItems": 1, "items": {"type": "string"}},
         "repositories": {"type": "array", "items": {"type": "string"}, "uniqueItems": true},
-        "timeoutSeconds": {"type": "integer", "minimum": 1, "maximum": 600}
+        "timeout_seconds": {"type": "integer", "minimum": 1, "maximum": 600}
       }}},
     "skills": {"type": "array", "items": {"type": "object", "additionalProperties": false,
       "required": ["id", "path"], "properties": {"id": {"type": "string", "pattern": "^[a-z0-9]+(-[a-z0-9]+)*$", "maxLength": 64}, "path": {"type": "string"}}}},
@@ -58,12 +58,12 @@
         "description": {"type": "string", "minLength": 1, "maxLength": 500},
         "path": {"type": "string", "minLength": 1},
         "argv": {"type": "array", "minItems": 1, "items": {"type": "string"}},
-        "passEnv": {"type": "array", "items": {"type": "string", "pattern": "^[A-Z][A-Z0-9_]{0,127}$"}, "uniqueItems": true},
-        "timeoutSeconds": {"type": "integer", "minimum": 1, "maximum": 600}
+        "pass_env": {"type": "array", "items": {"type": "string", "pattern": "^[A-Z][A-Z0-9_]{0,127}$"}, "uniqueItems": true},
+        "timeout_seconds": {"type": "integer", "minimum": 1, "maximum": 600}
       }}},
-    "toolSearch": {"type": "object", "additionalProperties": false, "required": ["mode"], "properties": {
+    "tool_search": {"type": "object", "additionalProperties": false, "required": ["mode"], "properties": {
       "mode": {"enum": ["lexical", "llm-rerank"]},
-      "modelBinding": {"type": "string", "pattern": "^[a-z][a-z0-9_-]{0,39}$"}
+      "model_binding": {"type": "string", "pattern": "^[a-z][a-z0-9_-]{0,39}$"}
     }}
   }
 }

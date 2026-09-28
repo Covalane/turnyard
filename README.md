@@ -40,13 +40,13 @@ go run ./examples/local-go \
   --commit-message 'feat: add health check'
 ```
 
-检查生成的三份 JSON，尤其是模型、检查命令和期望产出；如需指定必需文件，可给生成器添加 `--deliverable`，或编辑 `work.json`。运行时将命令响应中的 `sessionId` 和 `taskId` 赋给下面的变量：
+检查生成的三份 JSON，尤其是模型、检查命令和期望产出；如需指定必需文件，可给生成器添加 `--deliverable`，或编辑 `work.json`。运行时将命令响应中的 `session_id` 和 `task_id` 赋给下面的变量：
 
 ```sh
 bin/turnyard session create --file /tmp/turnyard-first-task/session.json
-SESSION_ID='填入返回的 sessionId'
+SESSION_ID='填入返回的 session_id'
 bin/turnyard task add "$SESSION_ID" --file /tmp/turnyard-first-task/work.json
-TASK_ID='填入返回的 taskId'
+TASK_ID='填入返回的 task_id'
 bin/turnyard task run "$TASK_ID"
 bin/turnyard task wait "$TASK_ID"
 bin/turnyard task show "$TASK_ID"

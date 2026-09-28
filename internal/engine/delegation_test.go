@@ -326,7 +326,7 @@ func TestDelegationHandoffRecovery(t *testing.T) {
 			}
 			status := response.(map[string]any)
 			if failure == "deterministic" {
-				if status["status"] != lifecycle.Failed || status["errorCode"] != fault.CodeHandoffUnavailable {
+				if status["status"] != lifecycle.Failed || status["error_code"] != fault.CodeHandoffUnavailable {
 					t.Fatalf("deterministic handoff failure was not retryable: %v", status)
 				}
 				if _, err := f.service.CompleteSession(ctx, child.SessionID); fault.CodeOf(err) != fault.CodeInvalidTransition {

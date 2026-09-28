@@ -80,7 +80,7 @@ const (
 type Error struct {
 	Code      Code   `json:"code"`
 	Message   string `json:"message"`
-	RequestID string `json:"requestId,omitempty"`
+	RequestID string `json:"request_id,omitempty"`
 	Op        string `json:"-"`
 	Cause     error  `json:"-"`
 	Trace     error  `json:"-"`

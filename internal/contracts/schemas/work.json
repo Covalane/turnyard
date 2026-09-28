@@ -1,16 +1,16 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "type": "object", "additionalProperties": false,
-  "required": ["schemaVersion", "idempotencyKey", "objective", "scope", "acceptance", "checks"],
+  "required": ["schema_version", "idempotency_key", "objective", "scope", "acceptance", "checks"],
   "anyOf": [
     {"properties": {"checks": {"minItems": 1}}},
     {"required": ["deliverables"], "properties": {"deliverables": {"minItems": 1}}}
   ],
   "properties": {
-    "schemaVersion": {"const": "turnyard.work/v1"},
-    "idempotencyKey": {"type": "string", "minLength": 1, "maxLength": 120},
+    "schema_version": {"const": "turnyard.work/v1"},
+    "idempotency_key": {"type": "string", "minLength": 1, "maxLength": 120},
     "objective": {"type": "string", "minLength": 1},
-    "commitMessage": {"type": "string", "minLength": 1, "maxLength": 80},
+    "commit_message": {"type": "string", "minLength": 1, "maxLength": 80},
     "scope": {"type": "object", "additionalProperties": false, "required": ["repositories"], "properties": {
       "repositories": {"type": "array", "items": {"type": "object", "additionalProperties": false,
         "required": ["id", "mode"], "properties": {
@@ -29,8 +29,8 @@
           "connector": {"type": "string", "minLength": 1},
           "uri": {"type": "string", "minLength": 1}
         }},
-        "expectedSha256": {"type": "string", "pattern": "^[a-f0-9]{64}$"},
-        "mediaType": {"type": "string", "minLength": 1}
+        "expected_sha256": {"type": "string", "pattern": "^[a-f0-9]{64}$"},
+        "media_type": {"type": "string", "minLength": 1}
       }}},
     "deliverables": {"type": "array", "items": {"type": "object", "additionalProperties": false,
       "required": ["id", "kind"], "properties": {
@@ -38,8 +38,8 @@
         "repository": {"type": "string"},
         "path": {"type": "string", "minLength": 1},
         "kind": {"enum": ["file", "image", "text", "pull_request"]},
-        "expectedSha256": {"type": "string", "pattern": "^[a-f0-9]{64}$"},
-        "mediaType": {"type": "string", "minLength": 1},
+        "expected_sha256": {"type": "string", "pattern": "^[a-f0-9]{64}$"},
+        "media_type": {"type": "string", "minLength": 1},
         "base": {"type": "string", "minLength": 1},
         "destination": {"type": "object", "additionalProperties": false, "required": ["kind"], "properties": {
           "kind": {"enum": ["local", "connector"]},

@@ -4,7 +4,7 @@
 
 ## Purpose
 
-`Session.primaryAgent` selects the primary agent. Other environment agents remain a catalog until the primary agent lists them in `agents[].delegates`. That list exposes the `turnyard_delegate` MCP tool. Without it, native tools, skills and MCP continue unchanged. Runtime-native subagents remain owned by their runtime and are not represented as Turnyard managed children.
+`Session.primary_agent` selects the primary agent. Other environment agents remain a catalog until the primary agent lists them in `agents[].delegates`. That list exposes the `turnyard_delegate` MCP tool. Without it, native tools, skills and MCP continue unchanged. Runtime-native subagents remain owned by their runtime and are not represented as Turnyard managed children.
 
 Each managed delegation is an independent child session and task with its own native session, turns, invocations, logs, checkpoints, candidate and outputs. SQLite links it to the parent session, task and invocation. `task show` and `session show` include `delegations` summaries.
 
@@ -15,13 +15,13 @@ Declare each agent with its own runtime, model, skills and tools, then allow spe
 ```json
 {
   "agents": [
-    {"id": "lead", "runtime": "opencode", "modelBinding": "main", "delegates": ["helper"]},
-    {"id": "helper", "runtime": "kimi", "modelBinding": "child", "tools": ["search"]}
+    {"id": "lead", "runtime": "opencode", "model_binding": "main", "delegates": ["helper"]},
+    {"id": "helper", "runtime": "kimi", "model_binding": "child", "tools": ["search"]}
   ]
 }
 ```
 
-The primary agent uses `find_tools` on the single MCP gateway to discover `turnyard_delegate/delegate`, then calls it through `call_tool` with `action: "submit"`, a stable `key`, an allowed `agentId`, objective, acceptance conditions, full repository scope, trusted checks and declared outputs. `inputIds` may reference the parent's staged attachments. Each child task needs at least one check or output. `submit` returns a child session ID and status; `status` inspects the same key. A repeated key and identical request returns the same child; changed input conflicts. `continue` accepts a reply for `needs_input` or an explicit retry for `failed`. An `unknown` child requires an operator to inspect external effects and run `task reconcile <child-task-id>` before retrying.
+The primary agent uses `find_tools` on the single MCP gateway to discover `turnyard_delegate/delegate`, then calls it through `call_tool` with `action: "submit"`, a stable `key`, an allowed `agent_id`, objective, acceptance conditions, full repository scope, trusted checks and declared outputs. `input_ids` may reference the parent's staged attachments. Each child task needs at least one check or output. `submit` returns a child session ID and status; `status` inspects the same key. A repeated key and identical request returns the same child; changed input conflicts. `continue` accepts a reply for `needs_input` or an explicit retry for `failed`. An `unknown` child requires an operator to inspect external effects and run `task reconcile <child-task-id>` before retrying.
 
 The child clones the parent's repository HEAD into an isolated workspace. Submission rejects uncommitted parent edits so the child cannot silently miss them. Its repository permissions cannot exceed the parent's scope. Child sessions disable remote Git publication and further managed delegation. Only after a candidate passes its checks and output verification does `status` return a read-only `handoff` under `/turnyard-control/delegations/<child-session-id>/`. Git blobs and deletions use the `repositories/` namespace; sealed non-Git files use `artifacts/`. Handoffs allow up to 512 MiB per file and 2 GiB of Git changes. A child session completes only after handoff succeeds. Deterministic size or unsupported-entry failures mark the child `failed / HANDOFF_UNAVAILABLE`, allowing an explicit retry under the same key. Transient export errors can be retried with `status`. The primary agent chooses what to integrate; Turnyard does not write into the parent's live workspace concurrently. Parent checks and outputs must still pass. An unfinished child makes the parent task wait, and the parent session cannot finish before its children.
 

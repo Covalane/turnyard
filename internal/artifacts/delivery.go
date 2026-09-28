@@ -22,19 +22,19 @@ func DeliverConnector(ctx context.Context, env contracts.EnvironmentSpec, spec c
 	result.Verification = VerificationConnectorReadback
 	connector, err := artifactio.Find(env, spec.Destination.Connector)
 	if err != nil {
-		observe.LogFailure(ctx, "deliverable connector unavailable", fault.Ensure(err, "select delivery connector"), "deliverableId", spec.ID)
+		observe.LogFailure(ctx, "deliverable connector unavailable", fault.Ensure(err, "select delivery connector"), "deliverable_id", spec.ID)
 		return unverified(result)
 	}
 	uri := strings.Replace(spec.Destination.URI, "{sha256}", result.SHA256, 1)
 	result.URI = uri
 	if result.LocalPath == "" {
-		observe.LogFailure(ctx, "deliverable local source unavailable", fault.New(fault.CodeDeliverableUnverified, "verified local source is missing"), "deliverableId", spec.ID)
+		observe.LogFailure(ctx, "deliverable local source unavailable", fault.New(fault.CodeDeliverableUnverified, "verified local source is missing"), "deliverable_id", spec.ID)
 		return unverified(result)
 	}
 	localHash, err := contracts.FileDigest(result.LocalPath)
 	if err != nil || localHash != result.SHA256 {
 		if err != nil {
-			observe.LogFailure(ctx, "deliverable local source unreadable", fault.Wrap(fault.CodeDeliverableUnverified, "digest delivery source", err, "verified local source cannot be read"), "deliverableId", spec.ID)
+			observe.LogFailure(ctx, "deliverable local source unreadable", fault.Wrap(fault.CodeDeliverableUnverified, "digest delivery source", err, "verified local source cannot be read"), "deliverable_id", spec.ID)
 		}
 		return unverified(result)
 	}
@@ -44,11 +44,11 @@ func DeliverConnector(ctx context.Context, env contracts.EnvironmentSpec, spec c
 		return compareReadback(ctx, result, readback)
 	}
 	if err := connector.Put(ctx, result.LocalPath, uri); err != nil {
-		observe.LogFailure(ctx, "deliverable upload unconfirmed", fault.Ensure(err, "upload deliverable"), "deliverableId", spec.ID, "connector", spec.Destination.Connector)
+		observe.LogFailure(ctx, "deliverable upload unconfirmed", fault.Ensure(err, "upload deliverable"), "deliverable_id", spec.ID, "connector", spec.Destination.Connector)
 		return unverified(result)
 	}
 	if err := connector.Get(ctx, uri, readback, maxOutputBytes); err != nil {
-		observe.LogFailure(ctx, "deliverable readback failed", fault.Ensure(err, "read back deliverable"), "deliverableId", spec.ID, "connector", spec.Destination.Connector)
+		observe.LogFailure(ctx, "deliverable readback failed", fault.Ensure(err, "read back deliverable"), "deliverable_id", spec.ID, "connector", spec.Destination.Connector)
 		return unverified(result)
 	}
 	return compareReadback(ctx, result, readback)
@@ -58,13 +58,13 @@ func compareReadback(ctx context.Context, result Result, path string) Result {
 	info, err := os.Lstat(path)
 	if err != nil || !info.Mode().IsRegular() || info.Size() > maxOutputBytes {
 		if err != nil {
-			observe.LogFailure(ctx, "deliverable readback unavailable", fault.Wrap(fault.CodeDeliverableUnverified, "inspect delivery readback", err, "readback file unavailable"), "deliverableId", result.ID)
+			observe.LogFailure(ctx, "deliverable readback unavailable", fault.Wrap(fault.CodeDeliverableUnverified, "inspect delivery readback", err, "readback file unavailable"), "deliverable_id", result.ID)
 		}
 		return unverified(result)
 	}
 	digest, err := contracts.FileDigest(path)
 	if err != nil {
-		observe.LogFailure(ctx, "deliverable readback unreadable", fault.Wrap(fault.CodeDeliverableUnverified, "digest delivery readback", err, "readback file cannot be read"), "deliverableId", result.ID)
+		observe.LogFailure(ctx, "deliverable readback unreadable", fault.Wrap(fault.CodeDeliverableUnverified, "digest delivery readback", err, "readback file cannot be read"), "deliverable_id", result.ID)
 		return unverified(result)
 	}
 	if digest != result.SHA256 {

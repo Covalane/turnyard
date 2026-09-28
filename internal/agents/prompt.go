@@ -55,7 +55,7 @@ func AgentPrompt(work contracts.WorkSpec, scope []contracts.ScopeRepo, reply, re
 			parts = append(parts, "Required files outside Git: "+strings.Join(localFiles, ", ")+". Turnyard will verify and deliver them to their configured destinations after checks pass.")
 		}
 		if len(claims) > 0 && claimPath != "" {
-			parts = append(parts, "Required outputs: "+strings.Join(claims, ", ")+". Write JSON to "+claimPath+" with schemaVersion turnyard.artifact-claims/v1 and artifacts array. Each item has id and either text or url. Create the parent directory first. This file is a claim; Turnyard will independently verify the output.")
+			parts = append(parts, "Required outputs: "+strings.Join(claims, ", ")+". Write JSON to "+claimPath+" with schema_version turnyard.artifact-claims/v1 and artifacts array. Each item has id and either text or url. Create the parent directory first. This file is a claim; Turnyard will independently verify the output.")
 		}
 	}
 	if retryCode != "" {

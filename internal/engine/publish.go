@@ -112,13 +112,13 @@ func (s *Service) PublishSession(ctx context.Context, sid string) (SessionPublic
 			if eventErr := record(target.taskID, lifecycle.EventFeaturePublishFailed, map[string]any{"repository": target.repoID, "branch": item.Branch, "head": item.Head, "code": item.ErrorCode}); eventErr != nil {
 				return SessionPublicationResult{}, eventErr
 			}
-			observe.Log.ErrorContext(ctx, "feature publication failed", "taskId", target.taskID, "repository", target.repoID, "code", item.ErrorCode, "origin", fault.Origin(err), "stack", fault.Stack(err))
+			observe.Log.ErrorContext(ctx, "feature publication failed", "task_id", target.taskID, "repository", target.repoID, "code", item.ErrorCode, "origin", fault.Origin(err), "stack", fault.Stack(err))
 		} else if pushed {
 			item.Status = FeaturePublicationPublished
 			if err := record(target.taskID, lifecycle.EventFeaturePublished, map[string]any{"repository": target.repoID, "branch": item.Branch, "head": item.Head}); err != nil {
 				return SessionPublicationResult{}, err
 			}
-			observe.Log.InfoContext(ctx, "feature published", "taskId", target.taskID, "repository", target.repoID, "head", item.Head)
+			observe.Log.InfoContext(ctx, "feature published", "task_id", target.taskID, "repository", target.repoID, "head", item.Head)
 		} else {
 			item.Status = FeaturePublicationAlreadyPublished
 		}

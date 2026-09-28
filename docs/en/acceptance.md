@@ -13,10 +13,10 @@ Place acceptance code in a separate Git repository at a pinned commit. Register 
   "id": "independent-acceptance",
   "argv": ["/workspace/oracle/verify", "/workspace/product"],
   "repositories": ["product", "oracle"],
-  "timeoutSeconds": 600
+  "timeout_seconds": 600
 }
 ```
 
-The agent can only read `oracle`; checks mount both repositories read-only. The pinned acceptance commit is part of the session repository version vector. A check result records its ID, `specDigest` of its definition, exit code, timeout status, and raw log path. Prefer assertions against public interfaces or the built artifact, including success, denial, and relevant failure paths.
+The agent can only read `oracle`; checks mount both repositories read-only. The pinned acceptance commit is part of the session repository version vector. A check result records its ID, `spec_digest` of its definition, exit code, timeout status, and raw log path. Prefer assertions against public interfaces or the built artifact, including success, denial, and relevant failure paths.
 
 The task author or reviewer should maintain and pin this repository before agent execution. Passing it still leaves uncoded requirements for human review. Live providers, browsers, deployments, and merge state need their own evidence. Tests kept solely in an agent-writable product repository are useful but do not count as independent acceptance.

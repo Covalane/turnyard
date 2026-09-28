@@ -57,10 +57,10 @@ func (s *Service) saveCheckpoint(ctx context.Context, sid, tid string, session c
 	if err != nil {
 		return "", err
 	}
-	meta := map[string]any{"sha256": hash, "repositories": status, "nativeId": native}
+	meta := map[string]any{"sha256": hash, "repositories": status, "native_id": native}
 	err = s.Store.SaveCheckpoint(ctx, store.CheckpointRecord{ID: id, SessionID: sid, TaskID: tid, Archive: archive, Metadata: contracts.JSONText(meta), SHA256: hash})
 	if err == nil {
-		observe.Log.InfoContext(ctx, "checkpoint saved", "sessionId", sid, "taskId", tid, "checkpointId", id, "sha256", hash)
+		observe.Log.InfoContext(ctx, "checkpoint saved", "session_id", sid, "task_id", tid, "checkpoint_id", id, "sha256", hash)
 	}
 	return id, err
 }
@@ -98,10 +98,10 @@ func (s *Service) Restore(ctx context.Context, id string) (RestoreResult, error)
 	if !reflect.DeepEqual(actual, meta.Repositories) {
 		return RestoreResult{}, fault.New(fault.CodeCheckpointCorrupt, "restored Git state differs")
 	}
-	err = s.Store.AppendEvent(ctx, checkpoint.SessionID, checkpoint.TaskID, lifecycle.EventCheckpointRestored, map[string]any{"checkpointId": id})
+	err = s.Store.AppendEvent(ctx, checkpoint.SessionID, checkpoint.TaskID, lifecycle.EventCheckpointRestored, map[string]any{"checkpoint_id": id})
 	if err != nil {
 		return RestoreResult{}, err
 	}
-	observe.Log.InfoContext(ctx, "checkpoint restored", "sessionId", checkpoint.SessionID, "taskId", checkpoint.TaskID, "checkpointId", id)
+	observe.Log.InfoContext(ctx, "checkpoint restored", "session_id", checkpoint.SessionID, "task_id", checkpoint.TaskID, "checkpoint_id", id)
 	return RestoreResult{CheckpointID: id, Workspace: row.Workspace, Restored: true}, nil
 }

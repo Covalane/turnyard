@@ -8,7 +8,7 @@ import (
 
 // SessionCreationResult identifies a new or replayed session creation.
 type SessionCreationResult struct {
-	SessionID string `json:"sessionId"`
+	SessionID string `json:"session_id"`
 	Status    string `json:"status"`
 	Workspace string `json:"workspace"`
 	Replayed  bool   `json:"replayed"`
@@ -16,28 +16,28 @@ type SessionCreationResult struct {
 
 // TaskAdditionResult identifies a new or replayed task append.
 type TaskAdditionResult struct {
-	TaskID   string `json:"taskId"`
+	TaskID   string `json:"task_id"`
 	Status   string `json:"status"`
 	Replayed bool   `json:"replayed"`
 }
 
 // TaskRunResult ties an invocation's checks and outputs to its candidate.
 type TaskRunResult struct {
-	TaskID          string             `json:"taskId"`
+	TaskID          string             `json:"task_id"`
 	Status          string             `json:"status"`
-	CandidateID     string             `json:"candidateId"`
-	CandidateDigest string             `json:"candidateDigest"`
-	CheckpointID    string             `json:"checkpointId"`
+	CandidateID     string             `json:"candidate_id"`
+	CandidateDigest string             `json:"candidate_digest"`
+	CheckpointID    string             `json:"checkpoint_id"`
 	Checks          []CheckResult      `json:"checks"`
 	Deliverables    []artifacts.Result `json:"deliverables"`
-	NeedsInput      string             `json:"needsInput"`
-	NativeSessionID string             `json:"nativeSessionId"`
+	NeedsInput      string             `json:"needs_input"`
+	NativeSessionID string             `json:"native_session_id"`
 }
 
 // CandidateVerificationResult reports a recheck of an existing candidate.
 type CandidateVerificationResult struct {
-	TaskID       string             `json:"taskId"`
-	CandidateID  string             `json:"candidateId"`
+	TaskID       string             `json:"task_id"`
+	CandidateID  string             `json:"candidate_id"`
 	Status       string             `json:"status"`
 	Checks       []CheckResult      `json:"checks"`
 	Deliverables []artifacts.Result `json:"deliverables"`
@@ -45,23 +45,23 @@ type CandidateVerificationResult struct {
 
 // SessionCancellationResult records why a finite session was ended.
 type SessionCancellationResult struct {
-	SchemaVersion string  `json:"schemaVersion"`
-	SessionID     string  `json:"sessionId"`
+	SchemaVersion string  `json:"schema_version"`
+	SessionID     string  `json:"session_id"`
 	Status        string  `json:"status"`
-	CancelledAt   float64 `json:"cancelledAt"`
+	CancelledAt   float64 `json:"cancelled_at"`
 	Reason        string  `json:"reason"`
 }
 
 // ReconcileResult records the checkpoint and workspace seen after reconciliation.
 type ReconcileResult struct {
-	TaskID       string                         `json:"taskId"`
-	CheckpointID string                         `json:"checkpointId"`
+	TaskID       string                         `json:"task_id"`
+	CheckpointID string                         `json:"checkpoint_id"`
 	Workspace    map[string]gitstate.RepoStatus `json:"workspace"`
 }
 
 // RestoreResult identifies the restored checkpoint and workspace path.
 type RestoreResult struct {
-	CheckpointID string `json:"checkpointId"`
+	CheckpointID string `json:"checkpoint_id"`
 	Workspace    string `json:"workspace"`
 	Restored     bool   `json:"restored"`
 }
@@ -69,18 +69,18 @@ type RestoreResult struct {
 // CandidateResult ties checks and declared outputs to one Git version vector.
 type CandidateResult struct {
 	ID           string                          `json:"id"`
-	TaskID       string                          `json:"taskId"`
+	TaskID       string                          `json:"task_id"`
 	Status       string                          `json:"status"`
 	Digest       string                          `json:"digest"`
 	Vector       map[string]gitstate.RepoVersion `json:"vector"`
 	Checks       []CheckResult                   `json:"checks"`
 	Deliverables []artifacts.Result              `json:"deliverables"`
-	CreatedAt    float64                         `json:"createdAt"`
+	CreatedAt    float64                         `json:"created_at"`
 }
 
 // TaskResult is the stable read model for one task and its execution history.
 type TaskResult struct {
-	SchemaVersion string                `json:"schemaVersion"`
+	SchemaVersion string                `json:"schema_version"`
 	Task          store.TaskRow         `json:"task"`
 	Invocations   []store.InvocationRow `json:"invocations"`
 	Candidate     *CandidateResult      `json:"candidate,omitempty"`
@@ -95,28 +95,28 @@ const DelegationHandoffUnavailable = "handoff_unavailable"
 
 // DelegationSummary links a parent task to one independently persisted child.
 type DelegationSummary struct {
-	SessionID       string `json:"sessionId"`
-	TaskID          string `json:"taskId"`
-	ParentTaskID    string `json:"parentTaskId"`
-	AgentID         string `json:"agentId"`
+	SessionID       string `json:"session_id"`
+	TaskID          string `json:"task_id"`
+	ParentTaskID    string `json:"parent_task_id"`
+	AgentID         string `json:"agent_id"`
 	Status          string `json:"status"`
-	CandidateID     string `json:"candidateId,omitempty"`
-	CandidateDigest string `json:"candidateDigest,omitempty"`
+	CandidateID     string `json:"candidate_id,omitempty"`
+	CandidateDigest string `json:"candidate_digest,omitempty"`
 }
 
 // Delivery summarizes a task's current candidate in a session handoff.
 type Delivery struct {
-	TaskID          string              `json:"taskId"`
+	TaskID          string              `json:"task_id"`
 	Status          string              `json:"status"`
-	CandidateID     string              `json:"candidateId,omitempty"`
-	CandidateDigest string              `json:"candidateDigest,omitempty"`
-	CandidateStatus string              `json:"candidateStatus,omitempty"`
+	CandidateID     string              `json:"candidate_id,omitempty"`
+	CandidateDigest string              `json:"candidate_digest,omitempty"`
+	CandidateStatus string              `json:"candidate_status,omitempty"`
 	Deliverables    *[]artifacts.Result `json:"deliverables,omitempty"`
 }
 
 // SessionResult is the stable read model for a finite requirement session.
 type SessionResult struct {
-	SchemaVersion string              `json:"schemaVersion"`
+	SchemaVersion string              `json:"schema_version"`
 	Session       store.SessionRow    `json:"session"`
 	Tasks         []store.TaskRow     `json:"tasks"`
 	Deliveries    []Delivery          `json:"deliveries"`
@@ -125,10 +125,10 @@ type SessionResult struct {
 
 // SessionCompletionResult records the final, candidate-bound handoff.
 type SessionCompletionResult struct {
-	SchemaVersion string     `json:"schemaVersion"`
-	SessionID     string     `json:"sessionId"`
+	SchemaVersion string     `json:"schema_version"`
+	SessionID     string     `json:"session_id"`
 	Status        string     `json:"status"`
-	CompletedAt   float64    `json:"completedAt"`
+	CompletedAt   float64    `json:"completed_at"`
 	Deliveries    []Delivery `json:"deliveries"`
 }
 
@@ -143,12 +143,12 @@ const (
 
 // PublishedFeature records the remote ref observed after a branch push.
 type PublishedFeature struct {
-	TaskID     string                   `json:"taskId"`
+	TaskID     string                   `json:"task_id"`
 	Repository string                   `json:"repository"`
 	Branch     string                   `json:"branch"`
 	Head       string                   `json:"head"`
 	Status     FeaturePublicationStatus `json:"status"`
-	ErrorCode  string                   `json:"errorCode,omitempty"`
+	ErrorCode  string                   `json:"error_code,omitempty"`
 }
 
 // SessionPublicationStatus summarizes the outcome across all feature branches.
@@ -162,8 +162,8 @@ const (
 // SessionPublicationResult preserves successes when a multi-repository push
 // fails partway through. Repeating publish reconciles each remote branch.
 type SessionPublicationResult struct {
-	SchemaVersion string                   `json:"schemaVersion"`
-	SessionID     string                   `json:"sessionId"`
+	SchemaVersion string                   `json:"schema_version"`
+	SessionID     string                   `json:"session_id"`
 	Status        SessionPublicationStatus `json:"status"`
 	Features      []PublishedFeature       `json:"features"`
 }

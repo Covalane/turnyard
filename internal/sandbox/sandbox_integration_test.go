@@ -67,7 +67,7 @@ func attempt(path string) string { if os.WriteFile(path, []byte("changed"), 0600
 func main() { switch os.Args[1] {
 case "boundary":
  _,homeErr:=os.Stat("/Users")
- result:=map[string]any{"ro":attempt("/workspace/ro/sentinel"),"rw":attempt("/workspace/rw/result"),"git":attempt("/workspace/rw/.git/probe"),"root":attempt("/root-probe"),"hostHomeVisible":homeErr==nil}
+ result:=map[string]any{"ro":attempt("/workspace/ro/sentinel"),"rw":attempt("/workspace/rw/result"),"git":attempt("/workspace/rw/.git/probe"),"root":attempt("/root-probe"),"host_home_visible":homeErr==nil}
  output,_:=json.Marshal(result);fmt.Println(string(output))
 case "redaction":fmt.Print(os.Getenv("OLLAMA_API_KEY"))
 case "timeout":time.Sleep(10*time.Second)
@@ -105,7 +105,7 @@ case "network":
 		t.Fatalf("boundary output invalid: %v (exit=%d output=%q log=%q)", err, first.ExitCode, first.Output, logData)
 	}
 	if first.ExitCode != 0 || boundary["ro"] != "blocked" || boundary["rw"] != "wrote" ||
-		boundary["git"] != "blocked" || boundary["root"] != "blocked" || boundary["hostHomeVisible"] != false {
+		boundary["git"] != "blocked" || boundary["root"] != "blocked" || boundary["host_home_visible"] != false {
 		t.Fatalf("boundary: %v", boundary)
 	}
 	secret := "turnyard-go-test-secret"

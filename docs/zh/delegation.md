@@ -4,7 +4,7 @@
 
 ## 作用
 
-`Session.primaryAgent` 指定主代理。环境中的其他代理只是配置目录；只有主代理的 `agents[].delegates` 明确列出的代理，才会作为 `turnyard_delegate` MCP 工具的可选目标。未配置委派时，主代理继续使用其原生工具、Skill 和 MCP；运行时原生子代理仍由该运行时自行管理，不会冒充 Turnyard 的受管子任务。
+`Session.primary_agent` 指定主代理。环境中的其他代理只是配置目录；只有主代理的 `agents[].delegates` 明确列出的代理，才会作为 `turnyard_delegate` MCP 工具的可选目标。未配置委派时，主代理继续使用其原生工具、Skill 和 MCP；运行时原生子代理仍由该运行时自行管理，不会冒充 Turnyard 的受管子任务。
 
 受管委派让主代理把一项可验证的工作交给另一运行时或模型。每次委派是一个独立子会话和子任务，拥有自己的原生会话、轮次、调用、日志、检查点、候选和交付物。父会话、父任务、发起调用、子代理 ID 与子会话的关联保存在 SQLite，并显示在 `task show` 和 `session show` 的 `delegations` 中。
 
@@ -15,13 +15,13 @@
 ```json
 {
   "agents": [
-    {"id": "lead", "runtime": "opencode", "modelBinding": "main", "delegates": ["helper"]},
-    {"id": "helper", "runtime": "kimi", "modelBinding": "child", "tools": ["search"]}
+    {"id": "lead", "runtime": "opencode", "model_binding": "main", "delegates": ["helper"]},
+    {"id": "helper", "runtime": "kimi", "model_binding": "child", "tools": ["search"]}
   ]
 }
 ```
 
-主代理先在统一 MCP 网关中用 `find_tools` 找到 `turnyard_delegate/delegate`，再通过 `call_tool` 传入 `action: "submit"`、稳定的 `key`、`agentId`、目标、验收条件、完整仓库读写范围、可信检查和声明产物；`inputIds` 可引用父任务已经封存的附件。子任务至少声明一个检查或产物。`submit` 返回子会话 ID 和当前状态；用同一 `key` 调用 `status` 查看结果。同键同内容重复提交返回原子任务，同键不同内容被拒绝。子任务需要人工输入时可用 `continue` 传入 `reply`；失败后可显式 `retry`。`unknown` 必须由操作员检查外部副作用并执行 `task reconcile <子任务ID>`，然后才能重试。
+主代理先在统一 MCP 网关中用 `find_tools` 找到 `turnyard_delegate/delegate`，再通过 `call_tool` 传入 `action: "submit"`、稳定的 `key`、`agent_id`、目标、验收条件、完整仓库读写范围、可信检查和声明产物；`input_ids` 可引用父任务已经封存的附件。子任务至少声明一个检查或产物。`submit` 返回子会话 ID 和当前状态；用同一 `key` 调用 `status` 查看结果。同键同内容重复提交返回原子任务，同键不同内容被拒绝。子任务需要人工输入时可用 `continue` 传入 `reply`；失败后可显式 `retry`。`unknown` 必须由操作员检查外部副作用并执行 `task reconcile <子任务ID>`，然后才能重试。
 
 子会话从父仓库当时的固定 HEAD 建立独立工作区。如果父工作区存在未提交的改动，提交委派会被拒绝，以免子代理静默丢失这些上下文。子代理不能获得超出父任务的仓库写入范围；子会话不启用远端 Git 发布或再次受管委派。只有子候选通过检查及声明产物核对，`status` 才返回只读 `handoff`：代码变更按固定 commit 的文件字节和删除清单导出到 `/turnyard-control/delegations/<子会话ID>/repositories/`，非 Git 文件从封存副本导出到独立的 `artifacts/` 命名空间。单文件交接上限为 512 MiB，Git 总变更上限为 2 GiB。交接成功后子会话才完成；确定性超限或不支持的 Git 条目会将子任务标为 `failed / HANDOFF_UNAVAILABLE`，主代理可用同一委派键显式重试；瞬时导出错误可重试 `status`。主代理自行选择并集成这些内容；Turnyard 不会在并发写入期间改动父工作区。父任务仍须通过自己的检查和产物校验，才算完成。未完成的子会话会使父任务等待继续；父会话不能在子会话未完成时结束。
 

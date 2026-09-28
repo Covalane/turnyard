@@ -20,12 +20,12 @@ import (
 
 type CheckResult struct {
 	ID           string   `json:"id"`
-	SpecDigest   string   `json:"specDigest"`
+	SpecDigest   string   `json:"spec_digest"`
 	Repositories []string `json:"repositories"`
-	ExitCode     int      `json:"exitCode"`
-	TimedOut     bool     `json:"timedOut"`
+	ExitCode     int      `json:"exit_code"`
+	TimedOut     bool     `json:"timed_out"`
 	Passed       bool     `json:"passed"`
-	LogPath      string   `json:"logPath"`
+	LogPath      string   `json:"log_path"`
 }
 
 func (s *Service) runChecks(ctx context.Context, tid, sid, candidateID string, work contracts.WorkSpec, env contracts.EnvironmentSpec, workspace string, backend sandbox.SandboxBackend) ([]CheckResult, error) {
@@ -62,7 +62,7 @@ func (s *Service) runChecks(ctx context.Context, tid, sid, candidateID string, w
 		if err != nil {
 			return out, err
 		}
-		observe.Log.InfoContext(ctx, "check completed", "sessionId", sid, "taskId", tid, "checkId", id, "passed", record.Passed, "exitCode", record.ExitCode, "timedOut", record.TimedOut, "logPath", logPath)
+		observe.Log.InfoContext(ctx, "check completed", "session_id", sid, "task_id", tid, "check_id", id, "passed", record.Passed, "exit_code", record.ExitCode, "timed_out", record.TimedOut, "log_path", logPath)
 	}
 	return out, nil
 }
@@ -199,7 +199,7 @@ func (s *Service) recordReverifyError(ctx context.Context, sessionID, taskID, ca
 	defer cancel()
 	if err := s.Store.ErrorReverify(persistCtx, sessionID, taskID, candidateID, cause); err != nil {
 		combined := fault.Wrap(fault.CodeInternalError, "persist reverify outcome", errors.Join(err, cause), "candidate verification failure could not be recorded")
-		observe.LogFailure(ctx, "candidate verification outcome persistence failed", combined, "candidateId", candidateID)
+		observe.LogFailure(ctx, "candidate verification outcome persistence failed", combined, "candidate_id", candidateID)
 		return combined
 	}
 	return cause

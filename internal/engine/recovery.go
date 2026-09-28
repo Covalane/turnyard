@@ -88,7 +88,7 @@ func (s *Service) ReconcileFailed(ctx context.Context, tid string) (ReconcileRes
 		if err := s.Store.ReconcileUnknown(ctx, task.SessionID, tid, id, task.ErrorCode.Value); err != nil {
 			return ReconcileResult{}, err
 		}
-		observe.Log.WarnContext(ctx, "unknown task reconciled", "sessionId", task.SessionID, "taskId", tid, "checkpointId", id)
+		observe.Log.WarnContext(ctx, "unknown task reconciled", "session_id", task.SessionID, "task_id", tid, "checkpoint_id", id)
 	}
 	status, err := gitstate.WorkspaceStatus(ctx, row.Workspace, session.Repositories)
 	return ReconcileResult{TaskID: tid, CheckpointID: id, Workspace: status}, err

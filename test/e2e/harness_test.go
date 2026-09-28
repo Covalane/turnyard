@@ -86,7 +86,7 @@ func newHarness(t *testing.T, prefix string) *harness {
 		t.Fatal(err)
 	}
 	ctx := context.Background()
-	h := &harness{t: t, root: root, ctx: ctx, evidence: map[string]any{"root": root, "startedAt": time.Now().Format(time.RFC3339Nano), "status": "running"}}
+	h := &harness{t: t, root: root, ctx: ctx, evidence: map[string]any{"root": root, "started_at": time.Now().Format(time.RFC3339Nano), "status": "running"}}
 	h.cli = os.Getenv("TURNYARD_BIN")
 	if h.cli == "" {
 		h.cli = filepath.Join(root, "turnyard")
@@ -100,7 +100,7 @@ func newHarness(t *testing.T, prefix string) *harness {
 		stopCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 		defer cancel()
 		_ = exec.CommandContext(stopCtx, h.cli, "--home", filepath.Join(root, "state"), "daemon", "stop").Run()
-		h.evidence["finishedAt"] = time.Now().Format(time.RFC3339Nano)
+		h.evidence["finished_at"] = time.Now().Format(time.RFC3339Nano)
 		if t.Failed() {
 			h.evidence["status"] = "failed"
 		} else {
@@ -179,7 +179,7 @@ func (h *harness) verified(stage string, result map[string]any, repos ...string)
 	h.t.Helper()
 	status := str(result, "task", "status")
 	candidate, _ := value(result, "candidate").(map[string]any)
-	h.evidence[stage] = map[string]any{"taskId": str(result, "task", "id"), "status": status, "errorCode": value(result, "task", "error_code"), "candidate": candidate}
+	h.evidence[stage] = map[string]any{"task_id": str(result, "task", "id"), "status": status, "error_code": value(result, "task", "error_code"), "candidate": candidate}
 	if status != "verified" {
 		h.t.Fatalf("%s status=%s error=%v", stage, status, value(result, "task", "error_code"))
 	}
@@ -229,8 +229,8 @@ func (h *harness) submitDeclared(sid, key, objective string, checks, repos []str
 	path := h.save(key+".json", work)
 	added := h.invoke("task", "add", sid, "--file", path)
 	repeat := h.invoke("task", "add", sid, "--file", path)
-	tid := required(h.t, added, "taskId")
-	if repeat["replayed"] != true || str(repeat, "taskId") != tid {
+	tid := required(h.t, added, "task_id")
+	if repeat["replayed"] != true || str(repeat, "task_id") != tid {
 		h.t.Fatal("idempotent add returned a different task")
 	}
 	if limit := os.Getenv("TURNYARD_E2E_TASK_TIMEOUT"); limit != "" {

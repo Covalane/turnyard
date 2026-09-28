@@ -26,7 +26,7 @@ func TestTextOutputManifest(t *testing.T) {
 	session := contracts.SessionSpec{SchemaVersion: contracts.SessionVersion, IdempotencyKey: "output-manifest",
 		Repositories: []contracts.RepositorySpec{{ID: "code", Type: "local-git", Path: source, Commit: sha}},
 		Environment:  "environment.json", PrimaryAgent: "lead"}
-	sid := required(t, h.invoke("session", "create", "--file", h.save("session.json", session)), "sessionId")
+	sid := required(t, h.invoke("session", "create", "--file", h.save("session.json", session)), "session_id")
 	result := h.submitDeclared(sid, "output", "在 code/note.txt 写入一句中文说明，并按产出声明格式提交 summary 文本，概述这句话的用途。", []string{"note"}, []string{"code"},
 		contracts.DeliverableSpec{ID: "note", Kind: contracts.DeliverableFile, Repository: "code", Path: "note.txt"},
 		contracts.DeliverableSpec{ID: "summary", Kind: contracts.DeliverableText})
@@ -62,7 +62,7 @@ func TestAttachmentArtifactOutput(t *testing.T) {
 	h.save("environment.json", env)
 	session := contracts.SessionSpec{SchemaVersion: contracts.SessionVersion, IdempotencyKey: "attachment-artifact",
 		Repositories: []contracts.RepositorySpec{}, Environment: "environment.json", PrimaryAgent: "lead"}
-	sid := required(t, h.invoke("session", "create", "--file", h.save("session.json", session)), "sessionId")
+	sid := required(t, h.invoke("session", "create", "--file", h.save("session.json", session)), "session_id")
 	inputPath := filepath.Join(h.root, "inputs", "brief.txt")
 	if err := os.WriteFile(inputPath, []byte("项目编号: CVL-7421\n请简短概括这个任务。\n"), 0o600); err != nil {
 		t.Fatal(err)
@@ -73,7 +73,7 @@ func TestAttachmentArtifactOutput(t *testing.T) {
 		Deliverables: []contracts.DeliverableSpec{{ID: "report", Kind: contracts.DeliverableFile, Path: "report.txt", MediaType: "text/plain", Destination: &contracts.DestinationSpec{Kind: contracts.DestinationLocal}}}}
 	work.Scope.Repositories = []contracts.ScopeRepo{}
 	added := h.invoke("task", "add", sid, "--file", h.save("work.json", work))
-	tid := required(t, added, "taskId")
+	tid := required(t, added, "task_id")
 	h.invoke("task", "run", tid)
 	result := h.invoke("task", "wait", tid)
 	h.verified("attachment", result)
@@ -82,7 +82,7 @@ func TestAttachmentArtifactOutput(t *testing.T) {
 		t.Fatalf("expected one local artifact: %v", items)
 	}
 	item, _ := items[0].(map[string]any)
-	output := required(t, item, "localPath")
+	output := required(t, item, "local_path")
 	if str(item, "status") != "present" || !strings.Contains(string(readFile(t, output)), "CVL-7421") {
 		t.Fatalf("agent did not derive output from attachment: %v", item)
 	}

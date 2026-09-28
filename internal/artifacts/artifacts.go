@@ -47,18 +47,18 @@ type Result struct {
 	Verification   VerificationMethod          `json:"verification"`
 	Repository     string                      `json:"repository,omitempty"`
 	Path           string                      `json:"path,omitempty"`
-	LocalPath      string                      `json:"localPath,omitempty"`
+	LocalPath      string                      `json:"local_path,omitempty"`
 	URI            string                      `json:"uri,omitempty"`
 	Commit         string                      `json:"commit,omitempty"`
 	SHA256         string                      `json:"sha256,omitempty"`
-	ExpectedSHA256 string                      `json:"expectedSha256,omitempty"`
+	ExpectedSHA256 string                      `json:"expected_sha256,omitempty"`
 	Bytes          int64                       `json:"bytes,omitempty"`
-	MediaType      string                      `json:"mediaType,omitempty"`
+	MediaType      string                      `json:"media_type,omitempty"`
 	Text           string                      `json:"text,omitempty"`
 	URL            string                      `json:"url,omitempty"`
 	Base           string                      `json:"base,omitempty"`
 	Head           string                      `json:"head,omitempty"`
-	ErrorCode      string                      `json:"errorCode,omitempty"`
+	ErrorCode      string                      `json:"error_code,omitempty"`
 }
 
 // PullRequestVerifier is supplied by an SCM integration. It must authenticate

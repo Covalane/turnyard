@@ -78,8 +78,8 @@ func PrepareTools(agent contracts.AgentSpec, env contracts.EnvironmentSpec, stat
 			config := contracts.JSONText(struct {
 				Description    string   `json:"description"`
 				Argv           []string `json:"argv"`
-				PassEnv        []string `json:"passEnv,omitempty"`
-				TimeoutSeconds int      `json:"timeoutSeconds,omitempty"`
+				PassEnv        []string `json:"pass_env,omitempty"`
+				TimeoutSeconds int      `json:"timeout_seconds,omitempty"`
 			}{tool.Description, argv, tool.PassEnv, tool.TimeoutSeconds})
 			if err := WritePinnedConfiguration(state, configPath, []byte(config), "executable tool "+id); err != nil {
 				return nil, err

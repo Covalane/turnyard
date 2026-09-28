@@ -43,7 +43,7 @@ func TestRealOSSConnector(t *testing.T) {
 	h.save("environment.json", env)
 	session := contracts.SessionSpec{SchemaVersion: contracts.SessionVersion, IdempotencyKey: "real-oss-connector",
 		Repositories: []contracts.RepositorySpec{}, Environment: "environment.json", PrimaryAgent: "lead"}
-	sid := required(t, h.invoke("session", "create", "--file", h.save("session.json", session)), "sessionId")
+	sid := required(t, h.invoke("session", "create", "--file", h.save("session.json", session)), "session_id")
 	work := contracts.WorkSpec{SchemaVersion: contracts.WorkVersion, IdempotencyKey: marker,
 		Objective:  fmt.Sprintf("在交付文件 report.txt 中写一句中文说明，并包含测试标记 %s。", marker),
 		Acceptance: []string{"交付文件包含本次测试标记"}, Checks: []string{"contains-marker"},
@@ -52,7 +52,7 @@ func TestRealOSSConnector(t *testing.T) {
 				Connector: "oss", URI: prefix + "{sha256}.txt"}}}}
 	work.Scope.Repositories = []contracts.ScopeRepo{}
 	added := h.invoke("task", "add", sid, "--file", h.save("work.json", work))
-	tid := required(t, added, "taskId")
+	tid := required(t, added, "task_id")
 	h.invoke("task", "run", tid)
 	result := h.invoke("task", "wait", tid)
 	items, _ := value(result, "candidate", "deliverables").([]any)

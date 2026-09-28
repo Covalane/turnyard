@@ -56,7 +56,7 @@ func (s *Store) CreateSession(ctx context.Context, in CreateSessionInput) (Sessi
 			return err
 		}
 		return addEvent(ctx, tx, in.ID, "", lifecycle.EventSessionCreated, map[string]any{
-			"repositories": in.Repositories, "environmentDigest": in.EnvironmentDigest, "imageDigest": in.ImageDigest})
+			"repositories": in.Repositories, "environment_digest": in.EnvironmentDigest, "image_digest": in.ImageDigest})
 	})
 	if err == nil {
 		return SessionCreation{ID: in.ID, Status: lifecycle.Ready, Workspace: in.Workspace, Digest: in.CreationDigest}, nil
@@ -127,7 +127,7 @@ func (s *Store) CompleteSession(ctx context.Context, sid string) (float64, error
 		if err := tx.Session.UpdateOneID(sid).SetStatus(lifecycle.Completed).SetCompletedAt(completedAt).Exec(ctx); err != nil {
 			return err
 		}
-		return addEvent(ctx, tx, sid, "", lifecycle.EventSessionCompleted, map[string]any{"taskIds": ids, "completedAt": completedAt})
+		return addEvent(ctx, tx, sid, "", lifecycle.EventSessionCompleted, map[string]any{"task_ids": ids, "completed_at": completedAt})
 	})
 	return completedAt, err
 }
@@ -187,7 +187,7 @@ func (s *Store) CancelSession(ctx context.Context, sid, reason string) (float64,
 			return err
 		}
 		return addEvent(ctx, tx, sid, "", lifecycle.EventSessionCancelled, map[string]any{
-			"reason": reason, "cancelledAt": cancelledAt})
+			"reason": reason, "cancelled_at": cancelledAt})
 	})
 	return cancelledAt, savedReason, err
 }

@@ -104,9 +104,9 @@ func TestChatroomWorkflow(t *testing.T) {
 	if err := os.MkdirAll(root, 0700); err != nil {
 		t.Fatal(err)
 	}
-	evidence := map[string]any{"root": root, "startedAt": time.Now().Format(time.RFC3339Nano), "status": "running"}
+	evidence := map[string]any{"root": root, "started_at": time.Now().Format(time.RFC3339Nano), "status": "running"}
 	defer func() {
-		evidence["finishedAt"] = time.Now().Format(time.RFC3339Nano)
+		evidence["finished_at"] = time.Now().Format(time.RFC3339Nano)
 		writeJSON(t, filepath.Join(root, "evidence.json"), evidence)
 	}()
 	source, head, hashes := fixture(t, root)
@@ -150,7 +150,7 @@ func TestChatroomWorkflow(t *testing.T) {
 	}
 	sessionID := created.SessionID
 	workspace := created.Workspace
-	evidence["sessionId"] = sessionID
+	evidence["session_id"] = sessionID
 	makeWork := func(key, objective, check string) string {
 		work := contracts.WorkSpec{SchemaVersion: "turnyard.work/v1", IdempotencyKey: key, Objective: objective,
 			Acceptance: []string{"聊天室行为符合现有验收测试", "不持久保存聊天记录"},
@@ -176,11 +176,11 @@ func TestChatroomWorkflow(t *testing.T) {
 		result, err := service.RunTask(ctx, taskID, "", false, 6*time.Minute)
 		if err != nil {
 			info, _ := service.TaskResult(ctx, taskID)
-			evidence[stage] = map[string]any{"taskId": taskID, "status": "failed", "error": err.Error(), "task": info}
+			evidence[stage] = map[string]any{"task_id": taskID, "status": "failed", "error": err.Error(), "task": info}
 			t.Fatalf("%s execution: %v", stage, err)
 		}
 		status := result.Status
-		evidence[stage] = map[string]any{"taskId": taskID, "status": status, "candidateId": result.CandidateID, "checkpointId": result.CheckpointID}
+		evidence[stage] = map[string]any{"task_id": taskID, "status": status, "candidate_id": result.CandidateID, "checkpoint_id": result.CheckpointID}
 		if status != "verified" {
 			t.Fatalf("%s status %s", stage, status)
 		}
@@ -199,8 +199,8 @@ func TestChatroomWorkflow(t *testing.T) {
 	if firstNative != secondNative {
 		t.Fatalf("native session changed: %s -> %s", firstNative, secondNative)
 	}
-	evidence["nativeSessionId"] = firstNative
-	evidence["taskIds"] = []string{firstID, secondID}
+	evidence["native_session_id"] = firstNative
+	evidence["task_ids"] = []string{firstID, secondID}
 	evidence["status"] = "passed"
 	fmt.Printf("CHAT_ACCEPTANCE_EVIDENCE=%s\n", filepath.Join(root, "evidence.json"))
 }

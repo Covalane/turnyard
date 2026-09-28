@@ -12,4 +12,4 @@ go build -o bin/turnyard ./cmd/turnyard
 bin/turnyard session create --file /tmp/turnyard-input/session.json
 ```
 
-将创建响应中的 `sessionId` 用于 `task add`，再用返回的 `taskId` 执行 `task run`、`task wait` 和 `task show`。生成后可修改三个 JSON，按[使用指南](README.md)准备沙箱镜像与 API key。每次新建独立需求须使用新的 `idempotencyKey`。
+将创建响应中的 `session_id` 用于 `task add`，再用返回的 `task_id` 执行 `task run`、`task wait` 和 `task show`。生成后可修改三个 JSON，按[使用指南](README.md)准备沙箱镜像与 API key。每次新建独立需求须使用新的 `idempotency_key`。

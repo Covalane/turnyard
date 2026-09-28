@@ -33,7 +33,7 @@ func TestTextAndImageOutputsEnterCompletionManifest(t *testing.T) {
 		if err := os.MkdirAll(input.ArtifactDir, 0o700); err != nil {
 			return AgentResult{}, err
 		}
-		claim := `{"schemaVersion":"turnyard.artifact-claims/v1","artifacts":[{"id":"summary","text":"实现说明：已完成。"}]}`
+		claim := `{"schema_version":"turnyard.artifact-claims/v1","artifacts":[{"id":"summary","text":"实现说明：已完成。"}]}`
 		if err := os.WriteFile(filepath.Join(input.ArtifactDir, "artifacts.json"), []byte(claim), 0o600); err != nil {
 			return AgentResult{}, err
 		}
@@ -82,7 +82,7 @@ func TestPullRequestClaimCannotCompleteWithoutProviderReadback(t *testing.T) {
 		if err := os.MkdirAll(input.ArtifactDir, 0o700); err != nil {
 			return AgentResult{}, err
 		}
-		claim := `{"schemaVersion":"turnyard.artifact-claims/v1","artifacts":[{"id":"review","url":"` + prURL + `"}]}`
+		claim := `{"schema_version":"turnyard.artifact-claims/v1","artifacts":[{"id":"review","url":"` + prURL + `"}]}`
 		if err := os.WriteFile(filepath.Join(input.ArtifactDir, "artifacts.json"), []byte(claim), 0o600); err != nil {
 			return AgentResult{}, err
 		}

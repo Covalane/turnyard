@@ -156,10 +156,10 @@ func (s *Service) RunTask(ctx context.Context, tid, reply string, retry bool, ti
 	persistErr := s.Store.FailInvocation(persistCtx, store.InvocationFailure{TaskID: tid, SessionID: task.SessionID, TurnID: turnID, InvocationID: invocationID, Status: final, Code: code, AgentAttempted: agentAttempted, Message: runErr.Error(), RequestID: observe.IDsFrom(ctx).RequestID})
 	if persistErr != nil {
 		combined := fault.Wrap(fault.CodeInternalError, "persist invocation outcome", errors.Join(persistErr, runErr), "could not record %s outcome", final)
-		observe.LogFailure(ctx, "invocation outcome persistence failed", combined, "invocationId", invocationID)
+		observe.LogFailure(ctx, "invocation outcome persistence failed", combined, "invocation_id", invocationID)
 		return TaskRunResult{}, combined
 	}
-	observe.Log.WarnContext(ctx, "invocation classified", "sessionId", task.SessionID, "taskId", tid, "invocationId", invocationID, "status", final, "code", code, "origin", fault.Origin(runErr), "stack", fault.Stack(runErr))
+	observe.Log.WarnContext(ctx, "invocation classified", "session_id", task.SessionID, "task_id", tid, "invocation_id", invocationID, "status", final, "code", code, "origin", fault.Origin(runErr), "stack", fault.Stack(runErr))
 	return TaskRunResult{}, runErr
 }
 
@@ -174,7 +174,7 @@ func (s *Service) recordPreflightFailure(ctx context.Context, task store.TaskRow
 	defer cancelPersist()
 	err := s.Store.FailPreflight(persistCtx, task.ID, task.SessionID, task.Status, next, fault.Code(code))
 	if err == nil {
-		observe.Log.WarnContext(ctx, "task preflight failed", "sessionId", task.SessionID, "taskId", task.ID, "status", next, "code", code)
+		observe.Log.WarnContext(ctx, "task preflight failed", "session_id", task.SessionID, "task_id", task.ID, "status", next, "code", code)
 	}
 	return err
 }

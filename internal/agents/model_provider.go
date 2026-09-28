@@ -39,7 +39,10 @@ type ModelProvider struct {
 	Endpoints      map[ModelWire]string
 }
 
-var modelProviders = map[string]ModelProvider{
+// ModelProviderCatalog owns lookup and built-in versus custom resolution.
+type ModelProviderCatalog map[string]ModelProvider
+
+var modelProviders = ModelProviderCatalog{
 	"ollama-cloud": {
 		Name: "Ollama Cloud", CredentialEnvs: []string{"OLLAMA_API_KEY", "OLLAMA_2_API_KEY"},
 		Endpoints: map[ModelWire]string{WireOpenAIChat: "https://ollama.com/v1"},
@@ -71,8 +74,13 @@ type resolvedProvider struct {
 	origin  providerOrigin
 }
 
-func resolveProvider(binding contracts.ModelBinding) resolvedProvider {
-	if profile, exists := modelProviders[binding.Provider]; exists {
+func (catalog ModelProviderCatalog) builtIn(name string) (ModelProvider, bool) {
+	profile, exists := catalog[name]
+	return profile, exists
+}
+
+func (catalog ModelProviderCatalog) resolve(binding contracts.ModelBinding) resolvedProvider {
+	if profile, exists := catalog.builtIn(binding.Provider); exists {
 		return resolvedProvider{profile: profile, origin: providerBuiltIn}
 	}
 	return resolvedProvider{origin: providerCustom, profile: ModelProvider{
@@ -104,7 +112,7 @@ func ProviderFor(binding contracts.ModelBinding, wire ModelWire) (ModelProvider,
 	if binding.Model == "" || binding.CredentialEnv == "" {
 		return ModelProvider{}, "", fault.New(fault.CodeModelUnavailable, "provider %s has no valid model and credential binding", binding.Provider)
 	}
-	provider := resolveProvider(binding)
+	provider := modelProviders.resolve(binding)
 	endpoint, err := provider.endpointFor(binding, wire)
 	if err != nil {
 		return ModelProvider{}, "", err

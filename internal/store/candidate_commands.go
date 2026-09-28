@@ -27,7 +27,7 @@ func (s *Store) RecordCandidate(ctx context.Context, sessionID, taskID, candidat
 			return err
 		}
 		return addEvent(ctx, tx, sessionID, taskID, lifecycle.EventCandidateRecorded, map[string]any{
-			"candidateId": candidateID, "digest": digest, "vector": vector, "status": lifecycle.CandidateReady})
+			"candidate_id": candidateID, "digest": digest, "vector": vector, "status": lifecycle.CandidateReady})
 	})
 }
 
@@ -87,12 +87,12 @@ func (s *Store) FinishCandidate(ctx context.Context, in CandidateOutcome) error 
 			typ = lifecycle.EventCandidateReverifyEnd
 		}
 		if err := addEvent(ctx, tx, in.SessionID, in.TaskID, typ, map[string]any{
-			"candidateId": in.CandidateID, "status": in.Status, "checks": in.Checks, "deliverables": in.Deliverables}); err != nil {
+			"candidate_id": in.CandidateID, "status": in.Status, "checks": in.Checks, "deliverables": in.Deliverables}); err != nil {
 			return err
 		}
 		if !in.Reverify {
 			return addEvent(ctx, tx, in.SessionID, in.TaskID, lifecycle.EventTaskState, map[string]any{
-				"status": in.Status, "checkpointId": in.CheckpointID})
+				"status": in.Status, "checkpoint_id": in.CheckpointID})
 		}
 		return nil
 	})
@@ -129,7 +129,7 @@ func (s *Store) StartReverify(ctx context.Context, sessionID, taskID, candidateI
 		if updated != 1 {
 			return fault.New(fault.CodeInvalidTransition, "task changed before re-verification")
 		}
-		return addEvent(ctx, tx, sessionID, taskID, lifecycle.EventCandidateReverifyStart, map[string]any{"candidateId": candidateID, "digest": digest})
+		return addEvent(ctx, tx, sessionID, taskID, lifecycle.EventCandidateReverifyStart, map[string]any{"candidate_id": candidateID, "digest": digest})
 	})
 }
 
@@ -158,7 +158,7 @@ func (s *Store) FailDelegationHandoff(ctx context.Context, sessionID, taskID, ca
 			return err
 		}
 		return addEvent(ctx, tx, sessionID, taskID, lifecycle.EventCandidateFailed,
-			map[string]any{"candidateId": candidateID, "code": fault.CodeHandoffUnavailable, "phase": lifecycle.PhaseDelegationHandoff})
+			map[string]any{"candidate_id": candidateID, "code": fault.CodeHandoffUnavailable, "phase": lifecycle.PhaseDelegationHandoff})
 	})
 }
 func (s *Store) ErrorReverify(ctx context.Context, sessionID, taskID, candidateID string, cause error) error {
@@ -166,7 +166,7 @@ func (s *Store) ErrorReverify(ctx context.Context, sessionID, taskID, candidateI
 		if err := tx.Task.UpdateOneID(taskID).SetStatus(lifecycle.Unknown).SetErrorCode(string(fault.CodeCheckError)).Exec(ctx); err != nil {
 			return err
 		}
-		return addEvent(ctx, tx, sessionID, taskID, lifecycle.EventCandidateReverifyError, map[string]any{"candidateId": candidateID, "message": cause.Error()})
+		return addEvent(ctx, tx, sessionID, taskID, lifecycle.EventCandidateReverifyError, map[string]any{"candidate_id": candidateID, "message": cause.Error()})
 	})
 }
 func (s *Store) ReconcileUnknown(ctx context.Context, sessionID, taskID, checkpointID, priorCode string) error {
@@ -179,6 +179,6 @@ func (s *Store) ReconcileUnknown(ctx context.Context, sessionID, taskID, checkpo
 		if n != 1 {
 			return fault.New(fault.CodeInvalidTransition, "task is no longer unknown")
 		}
-		return addEvent(ctx, tx, sessionID, taskID, lifecycle.EventTaskUnknownReconciled, map[string]any{"checkpointId": checkpointID, "previousErrorCode": priorCode})
+		return addEvent(ctx, tx, sessionID, taskID, lifecycle.EventTaskUnknownReconciled, map[string]any{"checkpoint_id": checkpointID, "previous_error_code": priorCode})
 	})
 }

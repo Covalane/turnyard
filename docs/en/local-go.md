@@ -12,4 +12,4 @@ go build -o bin/turnyard ./cmd/turnyard
 bin/turnyard session create --file /tmp/turnyard-input/session.json
 ```
 
-Use the returned `sessionId` with `task add`, then the returned `taskId` with `task run`, `task wait`, and `task show`. Edit the three generated JSON files as needed and prepare the sandbox image and API key using the [user guide](README.md). Use a new `idempotencyKey` for each independent requirement.
+Use the returned `session_id` with `task add`, then the returned `task_id` with `task run`, `task wait`, and `task show`. Edit the three generated JSON files as needed and prepare the sandbox image and API key using the [user guide](README.md). Use a new `idempotency_key` for each independent requirement.

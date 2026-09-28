@@ -96,8 +96,8 @@ func TestSkillMCPInjection(t *testing.T) {
 	env.Tools = []contracts.ToolSpec{{ID: "witness", Kind: "mcp", Path: filepath.Join(repoRoot, "examples", "mcp-witness"), Argv: []string{"env", "GOTMPDIR=/state", "go", "run", "{toolDir}/server.go"}}}
 	h.save("environment.json", env)
 	session := contracts.SessionSpec{SchemaVersion: "turnyard.session/v1", IdempotencyKey: "injection-workflow", Repositories: []contracts.RepositorySpec{{ID: "code", Type: "local-git", Path: source, Commit: sha}}, Environment: "environment.json", PrimaryAgent: "lead"}
-	sid := required(t, h.invoke("session", "create", "--file", h.save("session.json", session)), "sessionId")
-	h.evidence["sessionId"] = sid
+	sid := required(t, h.invoke("session", "create", "--file", h.save("session.json", session)), "session_id")
+	h.evidence["session_id"] = sid
 	result := h.submit(sid, "witness-alpha", "先读取 witness skill，再通过 find_tools 找到 witness 工具，使用 call_tool 调用它，参数 value 为 alpha。把工具返回的 token 原样写入 code/witness.txt，不要自行构造 token。", []string{"witness-check"}, "code")
 	h.verified("task", result, "code")
 	sessionRow := h.invoke("session", "show", sid)
@@ -106,7 +106,7 @@ func TestSkillMCPInjection(t *testing.T) {
 	inv, _ := value(result, "invocations").([]any)
 	last, _ := inv[len(inv)-1].(map[string]any)
 	events := collectEvents(t, required(t, last, "log_path"))
-	h.evidence["toolEvents"] = events
+	h.evidence["tool_events"] = events
 	skill, mcp := false, false
 	for _, e := range events {
 		if strings.EqualFold(e.Tool, "skill") {
@@ -119,10 +119,10 @@ func TestSkillMCPInjection(t *testing.T) {
 	if env.Sandbox.Backend == "docker" {
 		gatewayLog := string(readFile(t, required(t, last, "log_path")+".gateway.log"))
 		mcp = mcp && strings.Contains(gatewayLog, "tool=witness/stamp")
-		h.evidence["gatewayLog"] = gatewayLog
+		h.evidence["gateway_log"] = gatewayLog
 	}
-	h.evidence["skillCalled"] = skill
-	h.evidence["mcpCalled"] = mcp
+	h.evidence["skill_called"] = skill
+	h.evidence["mcp_called"] = mcp
 	if !skill || !mcp {
 		t.Fatalf("native skill=%v MCP=%v events=%v", skill, mcp, events)
 	}
@@ -160,7 +160,7 @@ func TestExecutableToolInjection(t *testing.T) {
 	session := contracts.SessionSpec{SchemaVersion: contracts.SessionVersion, IdempotencyKey: "executable-workflow",
 		Repositories: []contracts.RepositorySpec{{ID: "code", Type: "local-git", Path: source, Commit: sha}},
 		Environment:  "environment.json", PrimaryAgent: "lead"}
-	sid := required(t, h.invoke("session", "create", "--file", h.save("session.json", session)), "sessionId")
+	sid := required(t, h.invoke("session", "create", "--file", h.save("session.json", session)), "session_id")
 	objective := "先用 find_tools 找到生成 witness token 的工具，再用 call_tool 调用它，传入 args 数组 [\"alpha\"]。把返回的 token 原样写入 code/witness.txt，不要自己构造 token。"
 	if modelSearch {
 		objective = "先用 find_tools 查询精确的中文短语『请生成一个见证令牌』，再用 call_tool 调用找到的工具，传入 args 数组 [\"alpha\"]。把返回的 token 原样写入 code/witness.txt，不要自己构造 token。"
@@ -182,10 +182,10 @@ func TestExecutableToolInjection(t *testing.T) {
 		if modelSearch && !strings.Contains(gatewayLog, "tool model search") {
 			t.Fatal("model-assisted tool search was not observed")
 		}
-		h.evidence["gatewayLog"] = gatewayLog
+		h.evidence["gateway_log"] = gatewayLog
 	}
-	h.evidence["executableCalled"] = called
-	h.evidence["toolEvents"] = events
+	h.evidence["executable_called"] = called
+	h.evidence["tool_events"] = events
 	if !called {
 		t.Fatalf("tool gateway did not record the executable call: %+v", events)
 	}

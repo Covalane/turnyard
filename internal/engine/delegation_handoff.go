@@ -22,8 +22,8 @@ type delegatedFile struct {
 }
 
 type delegationHandoff struct {
-	CandidateID     string                    `json:"candidateId"`
-	CandidateDigest string                    `json:"candidateDigest"`
+	CandidateID     string                    `json:"candidate_id"`
+	CandidateDigest string                    `json:"candidate_digest"`
 	Changes         []gitstate.ExportedChange `json:"changes"`
 	Files           []delegatedFile           `json:"files"`
 }

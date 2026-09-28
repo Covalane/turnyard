@@ -38,20 +38,20 @@ const (
 type Backend struct {
 	ID             string   `json:"id"`
 	Argv           []string `json:"argv"`
-	PassEnv        []string `json:"passEnv,omitempty"`
-	TimeoutSeconds int      `json:"timeoutSeconds,omitempty"`
+	PassEnv        []string `json:"pass_env,omitempty"`
+	TimeoutSeconds int      `json:"timeout_seconds,omitempty"`
 }
 
 type Config struct {
 	Backends    []Backend      `json:"backends"`
-	CatalogLock string         `json:"catalogLock,omitempty"`
+	CatalogLock string         `json:"catalog_lock,omitempty"`
 	Matcher     *MatcherConfig `json:"matcher,omitempty"`
 }
 
 type candidate struct {
 	ID          string `json:"id"`
 	Description string `json:"description,omitempty"`
-	InputSchema any    `json:"inputSchema"`
+	InputSchema any    `json:"input_schema"`
 }
 
 type findInput struct {
@@ -69,7 +69,7 @@ type searchMatch struct {
 }
 
 type callInput struct {
-	ToolID    string         `json:"toolId" jsonschema:"Exact tool ID returned by find_tools"`
+	ToolID    string         `json:"tool_id" jsonschema:"Exact tool ID returned by find_tools"`
 	Arguments map[string]any `json:"arguments" jsonschema:"Arguments matching that tool's input schema"`
 }
 
@@ -235,7 +235,7 @@ func (g *Gateway) Call(ctx context.Context, id string, arguments map[string]any)
 	start := time.Now()
 	result, err := entry.backend.session.CallTool(callCtx, &mcp.CallToolParams{Name: entry.nativeName, Arguments: arguments})
 	if err != nil {
-		g.logger.WarnContext(ctx, "tool call failed", "tool", id, "durationMs", time.Since(start).Milliseconds(), "error", err)
+		g.logger.WarnContext(ctx, "tool call failed", "tool", id, "duration_ms", time.Since(start).Milliseconds(), "error", err)
 		return nil, fmt.Errorf("call %q: %w", id, err)
 	}
 	body, err := json.Marshal(result)
@@ -246,7 +246,7 @@ func (g *Gateway) Call(ctx context.Context, id string, arguments map[string]any)
 		g.logger.WarnContext(ctx, "tool result exceeds limit", "tool", id, "bytes", len(body))
 		return &mcp.CallToolResult{Content: []mcp.Content{&mcp.TextContent{Text: "Tool result exceeds 256 KiB; write large output to a file or artifact and return its path."}}, IsError: true}, nil
 	}
-	g.logger.InfoContext(ctx, "tool call", "tool", id, "durationMs", time.Since(start).Milliseconds(), "resultBytes", len(body), "toolError", result.IsError)
+	g.logger.InfoContext(ctx, "tool call", "tool", id, "duration_ms", time.Since(start).Milliseconds(), "result_bytes", len(body), "tool_error", result.IsError)
 	return result, nil
 }
 

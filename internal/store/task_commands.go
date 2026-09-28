@@ -54,7 +54,7 @@ func (s *Store) AddTask(ctx context.Context, in AddTaskInput) (AddTaskResult, er
 			SetStatus(lifecycle.Queued).SetCreatedAt(now()).Exec(ctx); err != nil {
 			return err
 		}
-		if err := addEvent(ctx, tx, in.SessionID, id, lifecycle.EventTaskAdded, map[string]any{"sequence": count + 1, "specDigest": in.Digest}); err != nil {
+		if err := addEvent(ctx, tx, in.SessionID, id, lifecycle.EventTaskAdded, map[string]any{"sequence": count + 1, "spec_digest": in.Digest}); err != nil {
 			return err
 		}
 		out = AddTaskResult{id, lifecycle.Queued, false}
