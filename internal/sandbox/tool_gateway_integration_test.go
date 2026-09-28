@@ -79,9 +79,9 @@ function rpc(method, params) {
   if (names !== 'call_tool,find_tools') throw Error('unexpected tool surface '+names);
   const found = await rpc('tools/call', {name:'find_tools',arguments:{query:'private credential'}});
   if (!JSON.stringify(found).includes('secret_tool/run')) throw Error('authorized tool not found');
-  const denied = await rpc('tools/call', {name:'call_tool',arguments:{toolId:'other/run',arguments:{}}});
+  const denied = await rpc('tools/call', {name:'call_tool',arguments:{tool_id:'other/run',arguments:{}}});
   if (!JSON.stringify(denied).includes('not granted')) throw Error('ungranted call was not denied');
-  const allowed = await rpc('tools/call', {name:'call_tool',arguments:{toolId:'secret_tool/run',arguments:{args:[]}}});
+  const allowed = await rpc('tools/call', {name:'call_tool',arguments:{tool_id:'secret_tool/run',arguments:{args:[]}}});
   if (!JSON.stringify(allowed).includes('SECRET_OK')) throw Error('credentialed tool failed');
   try { await fetch('https://api.github.com', {signal:AbortSignal.timeout(2000)}); throw Error('direct egress succeeded'); }
   catch (error) { if (error.message === 'direct egress succeeded') throw error; }
