@@ -18,14 +18,14 @@ import (
 	"github.com/Covalane/turnyard/internal/fault"
 	"github.com/Covalane/turnyard/internal/lifecycle"
 	"github.com/Covalane/turnyard/internal/observe"
-	"github.com/Covalane/turnyard/internal/sandbox"
+	sandboxregistry "github.com/Covalane/turnyard/internal/sandbox/registry"
 	"github.com/Covalane/turnyard/internal/stateops"
 	"github.com/Covalane/turnyard/internal/store"
 )
 
-func option(args []string, name string) (string, error) {
+func option(args []string, name cliFlag) (string, error) {
 	for i, arg := range args {
-		if arg == name {
+		if arg == string(name) {
 			if i+1 >= len(args) {
 				return "", fault.New(fault.CodeInvalidRequest, "%s needs a value", name)
 			}
@@ -34,9 +34,9 @@ func option(args []string, name string) (string, error) {
 	}
 	return "", fault.New(fault.CodeInvalidRequest, "missing %s", name)
 }
-func optional(args []string, name string) (string, bool) {
+func optional(args []string, name cliFlag) (string, bool) {
 	for i, arg := range args {
-		if arg == name && i+1 < len(args) {
+		if arg == string(name) && i+1 < len(args) {
 			return args[i+1], true
 		}
 	}
@@ -50,7 +50,7 @@ func positional(args []string, index int) (string, error) {
 }
 func runCLI(ctx context.Context, args []string) (map[string]any, error) {
 	home := DefaultHome()
-	if len(args) >= 2 && args[0] == "--home" {
+	if len(args) >= 2 && args[0] == string(cliFlagHome) {
 		home = args[1]
 		args = args[2:]
 	}
@@ -60,16 +60,18 @@ func runCLI(ctx context.Context, args []string) (map[string]any, error) {
 	}
 	home = abs
 	if len(args) == 0 {
-		return nil, fault.New(fault.CodeInvalidRequest, "usage: turnyard [--home DIR] doctor|daemon|session|task|checkpoint|state")
+		return nil, fault.New(fault.CodeInvalidRequest, "usage: turnyard [%s DIR] %s|%s|%s|%s|%s|%s",
+			cliFlagHome, cliCommandDoctor, cliCommandDaemon, cliCommandSession, cliCommandTask, cliCommandCheckpoint, cliCommandState)
 	}
-	switch args[0] {
-	case "state":
+	switch cliCommand(args[0]) {
+	case cliCommandState:
 		if len(args) < 2 {
-			return nil, fault.New(fault.CodeInvalidRequest, "state needs backup, verify, or restore")
+			return nil, fault.New(fault.CodeInvalidRequest, "%s needs %s, %s, or %s",
+				cliCommandState, cliVerbBackup, cliVerbVerify, cliVerbRestore)
 		}
-		switch args[1] {
-		case "backup":
-			destination, err := option(args[2:], "--out")
+		switch cliVerb(args[1]) {
+		case cliVerbBackup:
+			destination, err := option(args[2:], cliFlagOut)
 			if err != nil {
 				return nil, err
 			}
@@ -83,8 +85,8 @@ func runCLI(ctx context.Context, args []string) (map[string]any, error) {
 				return nil, err
 			}
 			return map[string]any{"backup": destination, "format": manifest.Format, "entries": len(manifest.Entries)}, nil
-		case "verify":
-			source, err := option(args[2:], "--from")
+		case cliVerbVerify:
+			source, err := option(args[2:], cliFlagFrom)
 			if err != nil {
 				return nil, err
 			}
@@ -93,12 +95,12 @@ func runCLI(ctx context.Context, args []string) (map[string]any, error) {
 				return nil, err
 			}
 			return map[string]any{"backup": source, "format": manifest.Format, "entries": len(manifest.Entries), "source": manifest.Source}, nil
-		case "restore":
-			source, err := option(args[2:], "--from")
+		case cliVerbRestore:
+			source, err := option(args[2:], cliFlagFrom)
 			if err != nil {
 				return nil, err
 			}
-			destination, err := option(args[2:], "--to")
+			destination, err := option(args[2:], cliFlagTo)
 			if err != nil {
 				return nil, err
 			}
@@ -107,12 +109,12 @@ func runCLI(ctx context.Context, args []string) (map[string]any, error) {
 			}
 			return map[string]any{"restored": true, "home": destination}, nil
 		default:
-			return nil, fault.New(fault.CodeInvalidRequest, "unknown state action")
+			return nil, fault.New(fault.CodeInvalidRequest, "unknown %s action", cliCommandState)
 		}
-	case "doctor":
+	case cliCommandDoctor:
 		probes := map[string]any{}
-		for _, name := range sandbox.BuiltinBackends() {
-			b, err := sandbox.Backend(name)
+		for _, name := range sandboxregistry.Backends() {
+			b, err := sandboxregistry.Backend(name)
 			if err != nil {
 				return nil, err
 			}
@@ -123,44 +125,39 @@ func runCLI(ctx context.Context, args []string) (map[string]any, error) {
 			}
 			probes[name] = p
 		}
-		credentials := map[string]bool{}
-		for _, name := range []string{"OLLAMA_API_KEY", "OLLAMA_2_API_KEY", "DEEPSEEK_API_KEY", "OPENAI_API_KEY"} {
-			credentials[name] = os.Getenv(name) != ""
-		}
-		probes["credential_environment_present"] = credentials
 		probes["agent_runtimes"] = registry.Runtimes()
 		probes["home"] = home
 		return probes, nil
-	case "daemon":
+	case cliCommandDaemon:
 		if len(args) < 2 {
-			return nil, fault.New(fault.CodeInvalidRequest, "daemon needs action")
+			return nil, fault.New(fault.CodeInvalidRequest, "%s needs action", cliCommandDaemon)
 		}
-		switch args[1] {
-		case "serve":
-			value, err := option(args[2:], "--home")
+		switch cliVerb(args[1]) {
+		case cliVerbServe:
+			value, err := option(args[2:], cliFlagHome)
 			if err != nil {
 				return nil, err
 			}
 			return nil, Serve(ctx, value)
-		case "start":
+		case cliVerbStart:
 			if err := StartDaemon(ctx, home); err != nil {
 				return nil, err
 			}
 			return ClientRequest(ctx, home, Request{Action: actionPing}, false)
-		case "status":
+		case cliVerbStatus:
 			return ClientRequest(ctx, home, Request{Action: actionPing}, false)
-		case "stop":
+		case cliVerbStop:
 			return ClientRequest(ctx, home, Request{Action: actionDaemonStop}, false)
 		default:
-			return nil, fault.New(fault.CodeInvalidRequest, "unknown daemon action")
+			return nil, fault.New(fault.CodeInvalidRequest, "unknown %s action", cliCommandDaemon)
 		}
-	case "session":
+	case cliCommandSession:
 		if len(args) < 2 {
-			return nil, fault.New(fault.CodeInvalidRequest, "session needs action")
+			return nil, fault.New(fault.CodeInvalidRequest, "%s needs action", cliCommandSession)
 		}
-		switch args[1] {
-		case "create":
-			path, err := option(args[2:], "--file")
+		switch cliVerb(args[1]) {
+		case cliVerbCreate:
+			path, err := option(args[2:], cliFlagFile)
 			if err != nil {
 				return nil, err
 			}
@@ -169,67 +166,67 @@ func runCLI(ctx context.Context, args []string) (map[string]any, error) {
 				return nil, err
 			}
 			timeout := 0
-			if value, ok := optional(args[2:], "--timeout"); ok {
+			if value, ok := optional(args[2:], cliFlagTimeout); ok {
 				timeout, err = strconv.Atoi(value)
 				if err != nil {
-					return nil, fault.Wrap(fault.CodeInvalidRequest, "parse session timeout", err, "invalid --timeout")
+					return nil, fault.Wrap(fault.CodeInvalidRequest, "parse session timeout", err, "invalid %s", cliFlagTimeout)
 				}
 			}
 			return ClientRequest(ctx, home, Request{Action: actionSessionCreate, File: path, Timeout: timeout}, true)
-		case "show":
+		case cliVerbShow:
 			id, err := positional(args, 2)
 			if err != nil {
 				return nil, err
 			}
 			return ClientRequest(ctx, home, Request{Action: actionSessionShow, SessionID: id}, true)
-		case "complete":
+		case cliVerbComplete:
 			id, err := positional(args, 2)
 			if err != nil {
 				return nil, err
 			}
 			return ClientRequest(ctx, home, Request{Action: actionSessionComplete, SessionID: id}, true)
-		case "publish":
+		case cliVerbPublish:
 			id, err := positional(args, 2)
 			if err != nil {
 				return nil, err
 			}
 			timeout := 600
-			if value, ok := optional(args[3:], "--timeout"); ok {
+			if value, ok := optional(args[3:], cliFlagTimeout); ok {
 				timeout, err = strconv.Atoi(value)
 				if err != nil {
-					return nil, fault.Wrap(fault.CodeInvalidRequest, "parse publish timeout", err, "invalid --timeout")
+					return nil, fault.Wrap(fault.CodeInvalidRequest, "parse publish timeout", err, "invalid %s", cliFlagTimeout)
 				}
 			}
 			return ClientRequest(ctx, home, Request{Action: actionSessionPublish, SessionID: id, Timeout: timeout}, true)
-		case "cancel":
+		case cliVerbCancel:
 			id, err := positional(args, 2)
 			if err != nil {
 				return nil, err
 			}
-			reason, err := option(args[3:], "--reason")
+			reason, err := option(args[3:], cliFlagReason)
 			if err != nil {
 				return nil, err
 			}
 			return ClientRequest(ctx, home, Request{Action: actionSessionCancel, SessionID: id, Reason: reason}, true)
-		case "events":
+		case cliVerbEvents:
 			id, err := positional(args, 2)
 			if err != nil {
 				return nil, err
 			}
 			after := int64(0)
-			if value, ok := optional(args[3:], "--after"); ok {
+			if value, ok := optional(args[3:], cliFlagAfter); ok {
 				after, err = strconv.ParseInt(value, 10, 64)
 				if err != nil {
 					return nil, err
 				}
 			}
 			return ClientRequest(ctx, home, Request{Action: actionEvents, SessionID: id, After: after}, true)
-		case "prune":
+		case cliVerbPrune:
 			id, err := positional(args, 2)
 			if err != nil {
 				return nil, err
 			}
-			backup, err := option(args[3:], "--backup")
+			backup, err := option(args[3:], cliFlagBackup)
 			if err != nil {
 				return nil, err
 			}
@@ -260,18 +257,18 @@ func runCLI(ctx context.Context, args []string) (map[string]any, error) {
 			}
 			return map[string]any{"session_id": id, "pruned": true, "backup": backup}, nil
 		}
-	case "task":
+	case cliCommandTask:
 		if len(args) < 2 {
-			return nil, fault.New(fault.CodeInvalidRequest, "task needs action")
+			return nil, fault.New(fault.CodeInvalidRequest, "%s needs action", cliCommandTask)
 		}
-		action := args[1]
+		action := cliVerb(args[1])
 		switch action {
-		case "add":
+		case cliVerbAdd:
 			sid, err := positional(args, 2)
 			if err != nil {
 				return nil, err
 			}
-			path, err := option(args[3:], "--file")
+			path, err := option(args[3:], cliFlagFile)
 			if err != nil {
 				return nil, err
 			}
@@ -280,45 +277,45 @@ func runCLI(ctx context.Context, args []string) (map[string]any, error) {
 				return nil, err
 			}
 			timeout := 0
-			if value, ok := optional(args[3:], "--timeout"); ok {
+			if value, ok := optional(args[3:], cliFlagTimeout); ok {
 				timeout, err = strconv.Atoi(value)
 				if err != nil {
-					return nil, fault.Wrap(fault.CodeInvalidRequest, "parse task addition timeout", err, "invalid --timeout")
+					return nil, fault.Wrap(fault.CodeInvalidRequest, "parse task addition timeout", err, "invalid %s", cliFlagTimeout)
 				}
 			}
 			return ClientRequest(ctx, home, Request{Action: actionTaskAdd, SessionID: sid, File: path, Timeout: timeout}, true)
-		case "run", "retry", "reply":
+		case cliVerbRun, cliVerbRetry, cliVerbReply:
 			id, err := positional(args, 2)
 			if err != nil {
 				return nil, err
 			}
 			timeout := 900
-			if value, ok := optional(args[3:], "--timeout"); ok {
+			if value, ok := optional(args[3:], cliFlagTimeout); ok {
 				timeout, err = strconv.Atoi(value)
 				if err != nil {
 					return nil, err
 				}
 			}
 			reply := ""
-			if action == "reply" {
-				reply, err = option(args[3:], "--text")
+			if action == cliVerbReply {
+				reply, err = option(args[3:], cliFlagText)
 				if err != nil {
 					return nil, err
 				}
 			}
-			return ClientRequest(ctx, home, Request{Action: actionTaskRun, TaskID: id, Reply: reply, Retry: action == "retry", Timeout: timeout}, true)
-		case "show", "wait", "verify", "reconcile":
+			return ClientRequest(ctx, home, Request{Action: actionTaskRun, TaskID: id, Reply: reply, Retry: action == cliVerbRetry, Timeout: timeout}, true)
+		case cliVerbShow, cliVerbWait, cliVerbVerify, cliVerbReconcile:
 			id, err := positional(args, 2)
 			if err != nil {
 				return nil, err
 			}
-			if action == "verify" {
+			if action == cliVerbVerify {
 				return ClientRequest(ctx, home, Request{Action: actionTaskVerify, TaskID: id}, true)
 			}
-			if action == "reconcile" {
+			if action == cliVerbReconcile {
 				return ClientRequest(ctx, home, Request{Action: actionTaskReconcile, TaskID: id}, true)
 			}
-			if action == "show" {
+			if action == cliVerbShow {
 				return ClientRequest(ctx, home, Request{Action: actionTaskShow, TaskID: id}, true)
 			}
 			for {
@@ -336,8 +333,8 @@ func runCLI(ctx context.Context, args []string) (map[string]any, error) {
 				time.Sleep(time.Second)
 			}
 		}
-	case "checkpoint":
-		if len(args) >= 3 && args[1] == "restore" {
+	case cliCommandCheckpoint:
+		if len(args) >= 3 && cliVerb(args[1]) == cliVerbRestore {
 			return ClientRequest(ctx, home, Request{Action: actionCheckpointRestore, CheckpointID: args[2]}, true)
 		}
 	}
@@ -361,7 +358,7 @@ func CLI(ctx context.Context, args []string, stdout, stderr io.Writer) int {
 		}
 		return 2
 	}
-	if len(args) >= 2 && args[0] == "daemon" && args[1] == "serve" {
+	if len(args) >= 2 && cliCommand(args[0]) == cliCommandDaemon && cliVerb(args[1]) == cliVerbServe {
 		return 0
 	}
 	body, err := json.MarshalIndent(result, "", "  ")

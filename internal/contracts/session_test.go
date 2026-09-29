@@ -8,7 +8,7 @@ import (
 
 func TestGitPolicyIsRequiredOnlyForRepositorySessions(t *testing.T) {
 	dir := t.TempDir()
-	environment := `{"schema_version":"turnyard.environment/v1","sandbox":{"backend":"docker","image":"agent:test"},"agents":[{"id":"lead","runtime":"opencode","model_binding":"cloud"}],"model_bindings":[{"id":"cloud","provider":"ollama-cloud","model":"test","credential_env":"OLLAMA_API_KEY"}]}`
+	environment := `{"schema_version":"turnyard.environment/v1","sandbox":{"backend":"docker","image":"agent:test"},"agents":[{"id":"lead","runtime":"opencode","model_binding":"cloud"}],"model_bindings":[{"id":"cloud","provider":"ollama-cloud","model":"test","credential_env":"MODEL_API_KEY"}]}`
 	if err := os.WriteFile(filepath.Join(dir, "environment.json"), []byte(environment), 0o600); err != nil {
 		t.Fatal(err)
 	}
@@ -50,7 +50,7 @@ func TestLoadSessionRejectsInvalidCustomModelEndpoint(t *testing.T) {
 func TestLoadSessionKeepsSandboxIsolationProfile(t *testing.T) {
 	dir := t.TempDir()
 	session := `{"schema_version":"turnyard.session/v1","idempotency_key":"isolation","repositories":[],"environment":"environment.json","primary_agent":"lead"}`
-	environment := `{"schema_version":"turnyard.environment/v1","sandbox":{"backend":"docker","image":"agent:test","isolation":"gvisor","network":"model-only"},"agents":[{"id":"lead","runtime":"opencode","model_binding":"cloud"}],"model_bindings":[{"id":"cloud","provider":"ollama-cloud","model":"test","credential_env":"OLLAMA_API_KEY"}]}`
+	environment := `{"schema_version":"turnyard.environment/v1","sandbox":{"backend":"docker","image":"agent:test","isolation":"gvisor","network":"model-only"},"agents":[{"id":"lead","runtime":"opencode","model_binding":"cloud"}],"model_bindings":[{"id":"cloud","provider":"ollama-cloud","model":"test","credential_env":"MODEL_API_KEY"}]}`
 	if err := os.WriteFile(filepath.Join(dir, "session.json"), []byte(session), 0o600); err != nil {
 		t.Fatal(err)
 	}

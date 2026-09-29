@@ -10,6 +10,7 @@ import (
 	"testing"
 
 	"github.com/Covalane/turnyard/internal/fault"
+	"github.com/Covalane/turnyard/internal/sandbox/docker"
 )
 
 func TestStopTaskChecksKeepsContainerRemovalFailure(t *testing.T) {
@@ -21,7 +22,7 @@ func TestStopTaskChecksKeepsContainerRemovalFailure(t *testing.T) {
 	if err := os.WriteFile(binary, []byte(script), 0o700); err != nil {
 		t.Fatal(err)
 	}
-	backend := NewOCIBackend(DockerDialect{Executable: binary})
+	backend := NewOCIBackend(docker.Dialect{Executable: binary})
 	err := backend.StopTaskChecks(context.Background(), "work_test")
 	if fault.CodeOf(err) != fault.CodeSandboxCleanupUnknown {
 		t.Fatalf("cleanup code=%s, err=%v", fault.CodeOf(err), err)
@@ -72,7 +73,7 @@ esac
 	if err := os.WriteFile(binary, []byte(script), 0o700); err != nil {
 		t.Fatal(err)
 	}
-	backend := NewOCIBackend(DockerDialect{Executable: binary})
+	backend := NewOCIBackend(docker.Dialect{Executable: binary})
 	if err := backend.StopInvocation(context.Background(), "inv_test"); err != nil {
 		t.Fatal(err)
 	}

@@ -14,6 +14,7 @@ import (
 	"github.com/Covalane/turnyard/internal/fault"
 	"github.com/Covalane/turnyard/internal/gitstate"
 	"github.com/Covalane/turnyard/internal/sandbox"
+	sandboxregistry "github.com/Covalane/turnyard/internal/sandbox/registry"
 	"github.com/Covalane/turnyard/internal/store"
 )
 
@@ -111,7 +112,7 @@ func NewServiceWithCapacity(ctx context.Context, root string, limits CapacityLim
 	if err != nil {
 		return nil, err
 	}
-	return &Service{Store: store, Capacity: capacity, BackendFactory: sandbox.Backend, DriverFactory: registry.Driver,
+	return &Service{Store: store, Capacity: capacity, BackendFactory: sandboxregistry.Backend, DriverFactory: registry.Driver,
 		ArtifactVerifier: artifacts.GitHubCLI{}}, nil
 }
 func (s *Service) Close() error {

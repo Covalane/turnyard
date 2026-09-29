@@ -21,8 +21,13 @@ func TestDelegationCrashRecovery(t *testing.T) {
 		t.Skip("set TURNYARD_DELEGATION_RECOVERY_E2E=1 for a real crash/recovery run")
 	}
 	requireCredential(t)
-	if os.Getenv("DEEPSEEK_API_KEY") == "" {
-		t.Skip("DEEPSEEK_API_KEY is required for the Codex child")
+	childCredentialEnv := os.Getenv("TURNYARD_DELEGATION_CHILD_CREDENTIAL_ENV")
+	if childCredentialEnv == "" || os.Getenv(childCredentialEnv) == "" {
+		t.Fatal("TURNYARD_DELEGATION_CHILD_CREDENTIAL_ENV must name an available child model credential")
+	}
+	childProvider, childModel := os.Getenv("TURNYARD_DELEGATION_CHILD_PROVIDER"), os.Getenv("TURNYARD_DELEGATION_CHILD_MODEL")
+	if childProvider == "" || childModel == "" {
+		t.Fatal("TURNYARD_DELEGATION_CHILD_PROVIDER and TURNYARD_DELEGATION_CHILD_MODEL are required")
 	}
 	h := newHarness(t, "delegation-recovery")
 	h.configEvidence()
@@ -30,7 +35,8 @@ func TestDelegationCrashRecovery(t *testing.T) {
 	env := h.environment([]contracts.CheckSpec{{ID: "witness", Argv: []string{"grep", "-qx", "RECOVERED_DELEGATION:alpha", "/workspace/code/witness.txt"}, Repositories: []string{"code"}}})
 	env.Agents[0].Delegates = []string{"helper"}
 	env.Agents = append(env.Agents, contracts.AgentSpec{ID: "helper", Runtime: "codex", ModelBinding: "child-cloud"})
-	env.ModelBindings = append(env.ModelBindings, contracts.ModelBinding{ID: "child-cloud", Provider: "deepseek", Model: "deepseek-v4-flash", CredentialEnv: "DEEPSEEK_API_KEY"})
+	env.ModelBindings = append(env.ModelBindings, contracts.ModelBinding{ID: "child-cloud",
+		Provider: childProvider, Model: childModel, CredentialEnv: childCredentialEnv})
 	h.save("environment.json", env)
 	session := contracts.SessionSpec{SchemaVersion: contracts.SessionVersion, IdempotencyKey: "delegation-recovery",
 		Repositories: []contracts.RepositorySpec{{ID: "code", Type: "local-git", Path: source, Commit: sha}},

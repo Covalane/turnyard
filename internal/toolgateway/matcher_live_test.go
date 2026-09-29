@@ -13,10 +13,15 @@ func TestRealModelRanksGrantedTool(t *testing.T) {
 	if os.Getenv("TURNYARD_MATCHER_E2E") != "1" {
 		t.Skip("set TURNYARD_MATCHER_E2E=1 for a real model ranking request")
 	}
-	if os.Getenv("OLLAMA_API_KEY") == "" {
-		t.Skip("OLLAMA_API_KEY is unavailable")
+	credentialEnv := os.Getenv("TURNYARD_MATCHER_CREDENTIAL_ENV")
+	if credentialEnv == "" || os.Getenv(credentialEnv) == "" {
+		t.Fatal("TURNYARD_MATCHER_CREDENTIAL_ENV must name an available model credential")
 	}
-	matcher, err := NewLLMMatcher(MatcherConfig{Endpoint: "https://ollama.com/v1", Model: "glm-5.3-flash", CredentialEnv: "OLLAMA_API_KEY"})
+	endpoint, model := os.Getenv("TURNYARD_MATCHER_ENDPOINT"), os.Getenv("TURNYARD_MATCHER_MODEL")
+	if endpoint == "" || model == "" {
+		t.Fatal("TURNYARD_MATCHER_ENDPOINT and TURNYARD_MATCHER_MODEL are required")
+	}
+	matcher, err := NewLLMMatcher(MatcherConfig{Endpoint: endpoint, Model: model, CredentialEnv: credentialEnv})
 	if err != nil {
 		t.Fatal(err)
 	}

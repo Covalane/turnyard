@@ -15,9 +15,13 @@ func TestProviderOriginControlsEndpointPolicy(t *testing.T) {
 		endpoint string
 		wantCode fault.Code
 	}{
-		{name: "built-in", binding: contracts.ModelBinding{Provider: "deepseek", Model: "example", CredentialEnv: "DEEPSEEK_API_KEY"},
+		{name: "built-in", binding: contracts.ModelBinding{Provider: "deepseek", Model: "example", CredentialEnv: "MODEL_API_KEY"},
 			wire: WireAnthropic, endpoint: "https://api.deepseek.com/anthropic"},
-		{name: "built-in override", binding: contracts.ModelBinding{Provider: "deepseek", Model: "example", CredentialEnv: "DEEPSEEK_API_KEY",
+		{name: "built-in with deployment key name", binding: contracts.ModelBinding{Provider: "deepseek", Model: "example", CredentialEnv: "TEAM_MODEL_KEY"},
+			wire: WireAnthropic, endpoint: "https://api.deepseek.com/anthropic"},
+		{name: "invalid credential name", binding: contracts.ModelBinding{Provider: "deepseek", Model: "example", CredentialEnv: "BAD-KEY"},
+			wire: WireAnthropic, wantCode: fault.CodeModelUnavailable},
+		{name: "built-in override", binding: contracts.ModelBinding{Provider: "deepseek", Model: "example", CredentialEnv: "MODEL_API_KEY",
 			Endpoints: contracts.ModelEndpoints{Anthropic: "https://other.example/v1"}}, wire: WireAnthropic, wantCode: fault.CodeModelUnavailable},
 		{name: "custom", binding: contracts.ModelBinding{Provider: "example", Model: "example", CredentialEnv: "EXAMPLE_API_KEY",
 			Endpoints: contracts.ModelEndpoints{Responses: "https://models.example.test/v1"}}, wire: WireResponses, endpoint: "https://models.example.test/v1"},
@@ -39,5 +43,21 @@ func TestProviderOriginControlsEndpointPolicy(t *testing.T) {
 				t.Fatalf("endpoint %q, want %q: %v", endpoint, tc.endpoint, err)
 			}
 		})
+	}
+}
+
+func TestInvocationReadsConfiguredCredentialVariable(t *testing.T) {
+	t.Setenv("TEAM_MODEL_KEY", "test-secret")
+	env := contracts.EnvironmentSpec{
+		Agents:        []contracts.AgentSpec{{ID: "lead", ModelBinding: "model"}},
+		ModelBindings: []contracts.ModelBinding{{ID: "model", Provider: "deepseek", Model: "example", CredentialEnv: "TEAM_MODEL_KEY"}},
+	}
+	_, binding, credential, err := ResolveInvocation(AgentInvocation{Environment: env, AgentID: "lead"})
+	if err != nil || binding.CredentialEnv != "TEAM_MODEL_KEY" || credential != "test-secret" {
+		t.Fatalf("configured credential was not selected: binding=%+v err=%v", binding, err)
+	}
+	t.Setenv("TEAM_MODEL_KEY", "")
+	if _, _, _, err := ResolveInvocation(AgentInvocation{Environment: env, AgentID: "lead"}); fault.CodeOf(err) != fault.CodeAuthUnavailable {
+		t.Fatalf("missing configured credential was accepted: %v", err)
 	}
 }

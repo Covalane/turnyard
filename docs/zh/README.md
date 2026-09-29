@@ -17,9 +17,11 @@
 ```sh
 go build -o bin/turnyard ./cmd/turnyard
 docker build -f Containerfile -t turnyard-agent:dev .
-export OLLAMA_API_KEY='你的 API key'
 bin/turnyard doctor
+export MODEL_API_KEY='你的 API key'
 ```
+
+`doctor` 探测沙箱后端并列出内置代理运行时，不验证代理登录状态，也不枚举宿主机的凭据变量。这里的 `MODEL_API_KEY` 是示例名；可通过生成器的 `--credential` 或 Environment 的 `model_bindings[].credential_env` 使用其他合法变量名。
 
 示例使用 Docker。若改用 Apple `container`，先运行 `container system start --enable-kernel-install`，再用 `container build -f Containerfile -t turnyard-agent:dev .` 构建镜像，并在 `Environment.sandbox.backend` 中选择 `apple-container`。Podman 的实际验证范围见[验证记录](validation.md)。
 
@@ -33,7 +35,7 @@ Linux Docker 可在可信的 Environment 中设置 `"sandbox":{"backend":"docker
 
 `Session.repositories` 逐个给出本机仓库根目录或远端仓库 URL，以及固定的 40 位 commit SHA；`primary_agent` 选择该会话的代理。`idempotency_key` 标识一次会话创建：超时或响应丢失后，用相同文件重试会返回同一会话；同一键对应不同输入会报冲突。要创建独立的新会话，应使用新键。会话一旦创建，任务会继续使用同一个原生运行时会话，不跨运行时迁移。远端配置见 [Git 工作流](git.md)。
 
-`Environment.agents` 将代理 ID 绑定到运行时和 `model_binding`。目前验证过的组合：OpenCode + Ollama Cloud/DeepSeek、Kimi Code + Ollama Cloud、Claude Code + DeepSeek、Codex CLI + DeepSeek。其中 OpenCode + DeepSeek 仅通过单任务工具调用链路，尚未完成多任务验证。内置提供方的端点和凭据要求集中管理；其他兼容提供方可显式配置 HTTPS `endpoints`。OpenCode + OpenAI 和 Kimi + DeepSeek/OpenAI 尚未完成真实链路验证。Skill、原生 MCP 服务和普通可执行工具由环境声明，再由代理 ID 选择；工具通过一个 MCP 网关按需发现，来源目录会锁定摘要，后续改变会触发环境漂移错误。见[代理能力与工具注入](tools.md)。
+`Environment.agents` 将代理 ID 绑定到运行时和 `model_binding`。目前验证过的组合：OpenCode + Ollama Cloud/DeepSeek、Kimi Code + Ollama Cloud、Claude Code + DeepSeek、Codex CLI + DeepSeek。其中 OpenCode + DeepSeek 仅通过单任务工具调用链路，尚未完成多任务验证。内置提供方的端点与 API 协议集中管理；凭据变量由 `model_binding.credential_env` 指定，在实际代理调用时从宿主环境读取。其他兼容提供方可显式配置 HTTPS `endpoints`。OpenCode + OpenAI 和 Kimi + DeepSeek/OpenAI 尚未完成真实链路验证。Skill、原生 MCP 服务和普通可执行工具由环境声明，再由代理 ID 选择；工具通过一个 MCP 网关按需发现，来源目录会锁定摘要，后续改变会触发环境漂移错误。见[代理能力与工具注入](tools.md)。
 
 `Work.scope.repositories` 按仓库设置 `read` 或 `write`；不修改代码的文档任务可使用空仓库列表。`inputs` 可附带本机文件、允许域名的 HTTPS 文件或连接器文件，任务接受前会固定实际字节。`deliverables` 声明必需产出物；文件和图片可从 Git 候选版本交付，也可从专用产出目录交付到本地或配置的对象存储。`acceptance` 写明验收目标；`checks` 引用环境中预先定义的命令。`commit_message` 可指定 Git 提交标题；未填写时从任务目标提取短标题，任务 ID 放在提交正文中。完整输入、交付配置和结果说明见[生命周期、交付与存储](lifecycle.md)。
 

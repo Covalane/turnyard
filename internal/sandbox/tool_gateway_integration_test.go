@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/Covalane/turnyard/internal/contracts"
+	"github.com/Covalane/turnyard/internal/sandbox/docker"
 )
 
 func TestToolGatewayKeepsCredentialOutsideAgent(t *testing.T) {
@@ -92,7 +93,7 @@ function rpc(method, params) {
 	if image == "" {
 		image = "turnyard-agent:dev"
 	}
-	backend := NewOCIBackend(DockerDialect{})
+	backend := NewOCIBackend(docker.Dialect{})
 	ctx, cancel := context.WithTimeout(context.Background(), 120*time.Second)
 	defer cancel()
 	result, err := backend.Run(ctx, SandboxRun{Name: "ty-tool-gateway-test", Sandbox: contracts.SandboxSpec{

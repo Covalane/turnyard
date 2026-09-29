@@ -13,7 +13,7 @@ import (
 
 func TestDelegationForwardsInvocationToMCP(t *testing.T) {
 	state := t.TempDir()
-	binding := contracts.ModelBinding{ID: "cloud", Provider: "deepseek", Model: "deepseek-v4-flash", CredentialEnv: "DEEPSEEK_API_KEY"}
+	binding := contracts.ModelBinding{ID: "cloud", Provider: "deepseek", Model: "deepseek-v4-flash", CredentialEnv: "MODEL_API_KEY"}
 	agent := contracts.AgentSpec{ID: "lead", Runtime: "codex", ModelBinding: "cloud", Delegates: []string{"helper"}}
 	env := contracts.EnvironmentSpec{Agents: []contracts.AgentSpec{agent}, ModelBindings: []contracts.ModelBinding{binding}}
 	if err := prepareCodex(binding, agent, env, state); err != nil {
@@ -32,7 +32,7 @@ func TestDelegationForwardsInvocationToMCP(t *testing.T) {
 
 func TestCodexNoToolSessionGainsInputCapability(t *testing.T) {
 	state := t.TempDir()
-	binding := contracts.ModelBinding{Provider: "deepseek", Model: "deepseek-v4-flash", CredentialEnv: "DEEPSEEK_API_KEY"}
+	binding := contracts.ModelBinding{Provider: "deepseek", Model: "deepseek-v4-flash", CredentialEnv: "MODEL_API_KEY"}
 	agent := contracts.AgentSpec{ID: "lead"}
 	env := contracts.EnvironmentSpec{}
 	if err := prepareCodex(binding, agent, env, state); err != nil {

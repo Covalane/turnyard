@@ -130,14 +130,18 @@ func TestGitHubRepositoryURLs(t *testing.T) {
 	}
 }
 
-func TestPrivateGitHubPRReadback(t *testing.T) {
+func TestGitHubPRReadback(t *testing.T) {
 	if os.Getenv("TURNYARD_GITHUB_PR_READBACK") != "1" {
-		t.Skip("requires authorized GitHub CLI and private validation repository")
+		t.Skip("set TURNYARD_GITHUB_PR_READBACK=1 with an accessible open PR")
 	}
-	const rawURL = "https://github.com/rwasayc/turnyard-auth/pull/1"
+	rawURL := os.Getenv("TURNYARD_GITHUB_PR_URL")
+	repositoryURL := os.Getenv("TURNYARD_GITHUB_REPOSITORY_URL")
+	if rawURL == "" || repositoryURL == "" {
+		t.Fatal("TURNYARD_GITHUB_PR_URL and TURNYARD_GITHUB_REPOSITORY_URL are required")
+	}
 	snapshot, err := (GitHubCLI{}).ReadPullRequest(context.Background(),
-		contracts.RepositorySpec{URL: "https://github.com/rwasayc/turnyard-auth.git"}, rawURL)
-	if err != nil || snapshot.URL != rawURL || snapshot.Base != "main" || len(snapshot.Head) != 40 || !snapshot.Open {
-		t.Fatalf("private PR readback: %+v %v", snapshot, err)
+		contracts.RepositorySpec{URL: repositoryURL}, rawURL)
+	if err != nil || snapshot.URL != rawURL || snapshot.Base == "" || len(snapshot.Head) != 40 || !snapshot.Open {
+		t.Fatalf("PR readback: %+v %v", snapshot, err)
 	}
 }

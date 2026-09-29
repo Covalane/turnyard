@@ -1,12 +1,9 @@
 package sandbox
 
-const (
-	BackendAppleContainer = "apple-container"
-	BackendDocker         = "docker"
-	BackendPodman         = "podman"
-)
+import "github.com/Covalane/turnyard/internal/sandbox/ocicli"
 
-// BuiltinBackends returns the built-in OCI backends in display order.
-func BuiltinBackends() []string {
-	return []string{BackendAppleContainer, BackendDocker, BackendPodman}
-}
+const (
+	BackendAppleContainer = ocicli.BackendAppleContainer
+	BackendDocker         = ocicli.BackendDocker
+	BackendPodman         = ocicli.BackendPodman
+)

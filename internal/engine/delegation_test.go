@@ -138,7 +138,7 @@ func TestManagedDelegationCreatesIsolatedVerifiedChildAndHandoff(t *testing.T) {
 		Sandbox: SandboxSpec{Backend: "docker", Image: "test:latest"},
 		Agents: []AgentSpec{{ID: "lead", Runtime: "opencode", ModelBinding: "model", Delegates: []string{"helper"}},
 			{ID: "helper", Runtime: "kimi", ModelBinding: "model"}},
-		ModelBindings: []ModelBinding{{ID: "model", Provider: "ollama-cloud", Model: "test", CredentialEnv: "OLLAMA_API_KEY"}},
+		ModelBindings: []ModelBinding{{ID: "model", Provider: "ollama-cloud", Model: "test", CredentialEnv: "MODEL_API_KEY"}},
 		Git:           GitPolicy{LocalCommits: true, RemoteWrites: "none"},
 		Checks:        []CheckSpec{{ID: "build", Argv: []string{"go", "version"}, Repositories: []string{"api"}}}}
 	writeJSON(t, filepath.Join(inputs, "environment.json"), env)

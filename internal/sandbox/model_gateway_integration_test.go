@@ -15,6 +15,7 @@ import (
 	"time"
 
 	"github.com/Covalane/turnyard/internal/contracts"
+	"github.com/Covalane/turnyard/internal/sandbox/docker"
 )
 
 func TestModelOnlyDockerBoundary(t *testing.T) {
@@ -52,7 +53,7 @@ for(const url of ['https://api.github.com', 'http://host.docker.internal:` + str
 }
 
 console.log('MODEL_ONLY_BOUNDARY_OK');`
-	backend := NewOCIBackend(DockerDialect{Executable: "docker"})
+	backend := NewOCIBackend(docker.Dialect{Executable: "docker"})
 	ctx, cancel := context.WithTimeout(context.Background(), 90*time.Second)
 	defer cancel()
 	result, err := backend.Run(ctx, SandboxRun{Name: "ty-network-test", Sandbox: contracts.SandboxSpec{
@@ -74,7 +75,7 @@ func TestModelGatewayCannotBeUsedFromBridge(t *testing.T) {
 	if image == "" {
 		image = "turnyard-agent:dev"
 	}
-	backend := NewOCIBackend(DockerDialect{Executable: "docker"})
+	backend := NewOCIBackend(docker.Dialect{Executable: "docker"})
 	ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
 	defer cancel()
 	lease, err := backend.startModelGateway(ctx, SandboxRun{Name: "ty-bridge-probe",

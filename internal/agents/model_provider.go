@@ -2,7 +2,7 @@ package agents
 
 import (
 	"net/url"
-	"slices"
+	"regexp"
 
 	"github.com/Covalane/turnyard/internal/contracts"
 	"github.com/Covalane/turnyard/internal/fault"
@@ -34,28 +34,31 @@ const (
 )
 
 type ModelProvider struct {
-	Name           string
-	CredentialEnvs []string
-	Endpoints      map[ModelWire]string
+	Name      string
+	Endpoints map[ModelWire]string
 }
+
+// A model binding chooses the host variable; provider profiles never pin a
+// deployment's credential names. Keep this in sync with environment.json.
+var modelCredentialEnvPattern = regexp.MustCompile(`^[A-Z][A-Z0-9_]{0,79}$`)
 
 // ModelProviderCatalog owns lookup and built-in versus custom resolution.
 type ModelProviderCatalog map[string]ModelProvider
 
 var modelProviders = ModelProviderCatalog{
 	"ollama-cloud": {
-		Name: "Ollama Cloud", CredentialEnvs: []string{"OLLAMA_API_KEY", "OLLAMA_2_API_KEY"},
+		Name:      "Ollama Cloud",
 		Endpoints: map[ModelWire]string{WireOpenAIChat: "https://ollama.com/v1"},
 	},
 	"deepseek": {
-		Name: "DeepSeek", CredentialEnvs: []string{"DEEPSEEK_API_KEY"},
+		Name: "DeepSeek",
 		Endpoints: map[ModelWire]string{
 			WireOpenAIChat: "https://api.deepseek.com", WireAnthropic: "https://api.deepseek.com/anthropic",
 			WireResponses: "https://api.deepseek.com/",
 		},
 	},
 	"openai": {
-		Name: "OpenAI", CredentialEnvs: []string{"OPENAI_API_KEY"},
+		Name:      "OpenAI",
 		Endpoints: map[ModelWire]string{WireOpenAIChat: "https://api.openai.com/v1"},
 	},
 }
@@ -84,7 +87,7 @@ func (catalog ModelProviderCatalog) resolve(binding contracts.ModelBinding) reso
 		return resolvedProvider{profile: profile, origin: providerBuiltIn}
 	}
 	return resolvedProvider{origin: providerCustom, profile: ModelProvider{
-		Name: binding.Provider, CredentialEnvs: []string{binding.CredentialEnv}, Endpoints: map[ModelWire]string{
+		Name: binding.Provider, Endpoints: map[ModelWire]string{
 			WireOpenAIChat: binding.Endpoints.OpenAIChat, WireAnthropic: binding.Endpoints.Anthropic,
 			WireResponses: binding.Endpoints.Responses,
 		},
@@ -94,9 +97,6 @@ func (catalog ModelProviderCatalog) resolve(binding contracts.ModelBinding) reso
 func (provider resolvedProvider) endpointFor(binding contracts.ModelBinding, wire ModelWire) (string, error) {
 	if provider.origin == providerBuiltIn && binding.Endpoints != (contracts.ModelEndpoints{}) {
 		return "", fault.New(fault.CodeModelUnavailable, "built-in provider %s does not accept endpoint overrides", binding.Provider)
-	}
-	if !slices.Contains(provider.profile.CredentialEnvs, binding.CredentialEnv) {
-		return "", fault.New(fault.CodeModelUnavailable, "provider %s has no valid credential binding", binding.Provider)
 	}
 	endpoint := provider.profile.Endpoints[wire]
 	if endpoint == "" {
@@ -109,7 +109,7 @@ func (provider resolvedProvider) endpointFor(binding contracts.ModelBinding, wir
 }
 
 func ProviderFor(binding contracts.ModelBinding, wire ModelWire) (ModelProvider, string, error) {
-	if binding.Model == "" || binding.CredentialEnv == "" {
+	if binding.Model == "" || !modelCredentialEnvPattern.MatchString(binding.CredentialEnv) {
 		return ModelProvider{}, "", fault.New(fault.CodeModelUnavailable, "provider %s has no valid model and credential binding", binding.Provider)
 	}
 	provider := modelProviders.resolve(binding)

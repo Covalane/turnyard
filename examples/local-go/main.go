@@ -24,7 +24,7 @@ func main() {
 	runtime := flag.String("runtime", "opencode", "agent runtime")
 	provider := flag.String("provider", "ollama-cloud", "model provider")
 	model := flag.String("model", "glm-5.3-flash", "model name")
-	credential := flag.String("credential", "OLLAMA_API_KEY", "host credential environment variable")
+	credential := flag.String("credential", "MODEL_API_KEY", "host credential environment variable")
 	flag.Parse()
 	if *repoPath == "" || *output == "" || *objective == "" {
 		fmt.Fprintln(os.Stderr, "required: --repo, --out, --objective")

@@ -22,7 +22,7 @@ func artifactFixture(t *testing.T, connector bool) *fixture {
 	env := EnvironmentSpec{SchemaVersion: contracts.EnvironmentVersion,
 		Sandbox:       SandboxSpec{Backend: "apple-container", Image: "test:latest"},
 		Agents:        []AgentSpec{{ID: "lead", Runtime: "opencode", ModelBinding: "model"}},
-		ModelBindings: []ModelBinding{{ID: "model", Provider: "ollama-cloud", Model: "glm-5.3-flash", CredentialEnv: "OLLAMA_API_KEY"}}}
+		ModelBindings: []ModelBinding{{ID: "model", Provider: "ollama-cloud", Model: "glm-5.3-flash", CredentialEnv: "MODEL_API_KEY"}}}
 	if connector {
 		env.ArtifactConnectors = []contracts.ArtifactConnectorSpec{{ID: "object", URIPrefix: "mem://bucket/reports/",
 			GetArgv: []string{os.Args[0], "-test.run=^TestArtifactConnectorHelperProcess$", "--", "get", "{uri}", "{file}"},

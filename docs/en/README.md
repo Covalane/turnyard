@@ -26,9 +26,11 @@ This example uses Docker, OpenCode, and Ollama Cloud with an **existing, clean G
 ```sh
 go build -o bin/turnyard ./cmd/turnyard
 docker build -f Containerfile -t turnyard-agent:dev .
-export OLLAMA_API_KEY='your API key'
 bin/turnyard doctor
+export MODEL_API_KEY='your API key'
 ```
+
+`doctor` probes sandbox backends and lists built-in agent runtimes; it does not verify agent login or enumerate host credential variables. `MODEL_API_KEY` is an example name. Use the generator's `--credential` flag or Environment's `model_bindings[].credential_env` to select another valid name.
 
 Generate three editable JSON files outside the target repository. The output directory must not contain files with the same names:
 

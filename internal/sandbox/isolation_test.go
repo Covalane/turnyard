@@ -9,6 +9,9 @@ import (
 
 	"github.com/Covalane/turnyard/internal/contracts"
 	"github.com/Covalane/turnyard/internal/fault"
+	"github.com/Covalane/turnyard/internal/sandbox/applecontainer"
+	"github.com/Covalane/turnyard/internal/sandbox/docker"
+	"github.com/Covalane/turnyard/internal/sandbox/podman"
 )
 
 func fakeDockerCLI(t *testing.T, output string) string {
@@ -24,7 +27,7 @@ func TestGVisorRequiresRegisteredDockerRuntime(t *testing.T) {
 	ctx := context.Background()
 	spec := contracts.SandboxSpec{Backend: BackendDocker, Network: contracts.SandboxNetworkModelOnly,
 		Isolation: contracts.SandboxIsolationGVisor}
-	available := NewOCIBackend(DockerDialect{Executable: fakeDockerCLI(t, `{"runsc":{},"runc":{}}`)})
+	available := NewOCIBackend(docker.Dialect{Executable: fakeDockerCLI(t, `{"runsc":{},"runc":{}}`)})
 	if err := available.ValidateSpec(ctx, spec); err != nil {
 		t.Fatalf("registered runsc rejected: %v", err)
 	}
@@ -32,14 +35,14 @@ func TestGVisorRequiresRegisteredDockerRuntime(t *testing.T) {
 	if err != nil || !reflect.DeepEqual(options, []string{"--runtime", "runsc"}) {
 		t.Fatalf("gVisor runtime options: %v %v", options, err)
 	}
-	missing := NewOCIBackend(DockerDialect{Executable: fakeDockerCLI(t, `{"runc":{}}`)})
+	missing := NewOCIBackend(docker.Dialect{Executable: fakeDockerCLI(t, `{"runc":{}}`)})
 	if code := fault.CodeOf(missing.ValidateSpec(ctx, spec)); code != fault.CodeCapabilityMissing {
 		t.Fatalf("missing runsc code: %s", code)
 	}
 	if code := fault.CodeOf(missing.ValidateSpec(ctx, contracts.SandboxSpec{Isolation: "unknown"})); code != fault.CodeCapabilityMissing {
 		t.Fatalf("unknown isolation code: %s", code)
 	}
-	for _, backend := range []SandboxBackend{NewOCIBackend(AppleDialect{}), NewOCIBackend(PodmanDialect{})} {
+	for _, backend := range []SandboxBackend{NewOCIBackend(applecontainer.Dialect{}), NewOCIBackend(podman.Dialect{})} {
 		unsupported := spec
 		unsupported.Network = contracts.SandboxNetworkDefault
 		if code := fault.CodeOf(backend.ValidateSpec(ctx, unsupported)); code != fault.CodeCapabilityMissing {

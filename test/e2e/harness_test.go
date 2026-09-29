@@ -256,14 +256,27 @@ func (h *harness) assertDeliverables(result map[string]any, ids ...string) {
 	}
 }
 func (h *harness) environment(checks []contracts.CheckSpec) contracts.EnvironmentSpec {
-	return contracts.EnvironmentSpec{SchemaVersion: "turnyard.environment/v1", Sandbox: contracts.SandboxSpec{Backend: option("TURNYARD_E2E_BACKEND", "apple-container"), Image: option("TURNYARD_E2E_IMAGE", "turnyard-agent:dev"), CPUs: 2, MemoryMB: 2048, Network: contracts.SandboxNetworkPolicy(option("TURNYARD_E2E_NETWORK", "default")), Isolation: contracts.SandboxIsolationProfile(os.Getenv("TURNYARD_E2E_ISOLATION"))}, Agents: []contracts.AgentSpec{{ID: "lead", Runtime: option("TURNYARD_E2E_RUNTIME", "opencode"), ModelBinding: "cloud"}}, ModelBindings: []contracts.ModelBinding{{ID: "cloud", Provider: option("TURNYARD_E2E_PROVIDER", "ollama-cloud"), Model: option("TURNYARD_E2E_MODEL", "glm-5.3-flash"), CredentialEnv: option("TURNYARD_E2E_CREDENTIAL_ENV", "OLLAMA_API_KEY")}}, Git: contracts.GitPolicy{LocalCommits: true, RemoteWrites: contracts.GitRemoteWritesNone}, Checks: checks}
+	credentialEnv := requiredCredentialEnv(h.t)
+	return contracts.EnvironmentSpec{SchemaVersion: "turnyard.environment/v1", Sandbox: contracts.SandboxSpec{Backend: option("TURNYARD_E2E_BACKEND", "apple-container"), Image: option("TURNYARD_E2E_IMAGE", "turnyard-agent:dev"), CPUs: 2, MemoryMB: 2048, Network: contracts.SandboxNetworkPolicy(option("TURNYARD_E2E_NETWORK", "default")), Isolation: contracts.SandboxIsolationProfile(os.Getenv("TURNYARD_E2E_ISOLATION"))}, Agents: []contracts.AgentSpec{{ID: "lead", Runtime: option("TURNYARD_E2E_RUNTIME", "opencode"), ModelBinding: "cloud"}}, ModelBindings: []contracts.ModelBinding{{ID: "cloud", Provider: requiredSetting(h.t, "TURNYARD_E2E_PROVIDER"), Model: requiredSetting(h.t, "TURNYARD_E2E_MODEL"), CredentialEnv: credentialEnv}}, Git: contracts.GitPolicy{LocalCommits: true, RemoteWrites: contracts.GitRemoteWritesNone}, Checks: checks}
 }
 func requireCredential(t *testing.T) {
 	t.Helper()
-	name := option("TURNYARD_E2E_CREDENTIAL_ENV", "OLLAMA_API_KEY")
+	name := requiredCredentialEnv(t)
 	if os.Getenv(name) == "" {
 		t.Fatalf("%s is required", name)
 	}
+}
+func requiredCredentialEnv(t *testing.T) string {
+	t.Helper()
+	return requiredSetting(t, "TURNYARD_E2E_CREDENTIAL_ENV")
+}
+func requiredSetting(t *testing.T, name string) string {
+	t.Helper()
+	value := os.Getenv(name)
+	if value == "" {
+		t.Fatalf("%s is required for a real model run", name)
+	}
+	return value
 }
 func (h *harness) readGreeting(workspace string) string {
 	h.t.Helper()

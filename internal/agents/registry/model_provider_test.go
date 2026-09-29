@@ -16,14 +16,15 @@ func TestProviderTransportIsIndependentOfRuntime(t *testing.T) {
 		key      string
 		allowed  bool
 	}{
-		{"opencode", "ollama-cloud", "OLLAMA_API_KEY", true},
-		{"opencode", "deepseek", "DEEPSEEK_API_KEY", true},
-		{"kimi", "openai", "OPENAI_API_KEY", true},
-		{"claude", "deepseek", "DEEPSEEK_API_KEY", true},
-		{"codex", "deepseek", "DEEPSEEK_API_KEY", true},
-		{"codex", "ollama-cloud", "OLLAMA_API_KEY", false},
-		{"claude", "openai", "OPENAI_API_KEY", false},
-		{"opencode", "deepseek", "OLLAMA_API_KEY", false},
+		{"opencode", "ollama-cloud", "MODEL_API_KEY", true},
+		{"opencode", "ollama-cloud", "ALTERNATE_MODEL_KEY", true},
+		{"opencode", "deepseek", "MODEL_API_KEY", true},
+		{"kimi", "openai", "MODEL_API_KEY", true},
+		{"claude", "deepseek", "MODEL_API_KEY", true},
+		{"codex", "deepseek", "MODEL_API_KEY", true},
+		{"codex", "ollama-cloud", "MODEL_API_KEY", false},
+		{"claude", "openai", "MODEL_API_KEY", false},
+		{"opencode", "deepseek", "TEAM_MODEL_KEY", true},
 	}
 	for _, test := range tests {
 		driver, err := Driver(test.runtime)

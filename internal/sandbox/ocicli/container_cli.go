@@ -1,4 +1,5 @@
-package sandbox
+// Package ocicli contains OCI CLI behavior shared by sandbox dialects.
+package ocicli
 
 import (
 	"context"
@@ -12,10 +13,16 @@ import (
 
 // Docker and Podman share these OCI-compatible CLI operations. Their runtime
 // capabilities remain separate in their respective dialect implementations.
-func containerListArgs() []string              { return []string{"ps", "-a", "--format", "{{.Names}}"} }
-func containerDeleteArgs(name string) []string { return []string{"rm", "-f", name} }
+const (
+	BackendAppleContainer = "apple-container"
+	BackendDocker         = "docker"
+	BackendPodman         = "podman"
+)
 
-func containerRunOptions(network contracts.SandboxNetworkPolicy) ([]string, error) {
+func ListArgs() []string              { return []string{"ps", "-a", "--format", "{{.Names}}"} }
+func DeleteArgs(name string) []string { return []string{"rm", "-f", name} }
+
+func RunOptions(network contracts.SandboxNetworkPolicy) ([]string, error) {
 	args := []string{"--cap-drop", "ALL", "--security-opt", "no-new-privileges"}
 	switch network {
 	case "", contracts.SandboxNetworkDefault:
@@ -27,12 +34,12 @@ func containerRunOptions(network contracts.SandboxNetworkPolicy) ([]string, erro
 	return args, nil
 }
 
-func containerImageIdentity(ctx context.Context, binary, image string) (string, error) {
+func ImageIdentity(ctx context.Context, binary, image string) (string, error) {
 	ctx, cancel := context.WithTimeout(ctx, 30*time.Second)
 	defer cancel()
 	out, err := exec.CommandContext(ctx, binary, "image", "inspect", "--format", "{{.Id}}", image).Output()
 	if err != nil {
-		return "", imageInspectError(ctx, err, image)
+		return "", ImageInspectError(ctx, err, image)
 	}
 	digest := strings.TrimSpace(string(out))
 	if digest == "" {
@@ -43,7 +50,7 @@ func containerImageIdentity(ctx context.Context, binary, image string) (string, 
 
 // A failed inspect is not proof that an image is missing: the daemon or CLI
 // may be unavailable. Only explicit CLI messages receive IMAGE_MISSING.
-func imageInspectError(ctx context.Context, err error, image string) error {
+func ImageInspectError(ctx context.Context, err error, image string) error {
 	if ctx.Err() != nil {
 		return fault.Wrap(fault.CodeInterrupted, "inspect image", err, "image inspection interrupted")
 	}

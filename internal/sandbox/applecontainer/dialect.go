@@ -1,4 +1,4 @@
-package sandbox
+package applecontainer
 
 import (
 	"context"
@@ -8,23 +8,25 @@ import (
 
 	"github.com/Covalane/turnyard/internal/contracts"
 	"github.com/Covalane/turnyard/internal/fault"
+	"github.com/Covalane/turnyard/internal/sandbox/ocicli"
 )
 
-type AppleDialect struct{}
+// Dialect supplies Apple container-specific commands to the shared OCI backend.
+type Dialect struct{}
 
-func (AppleDialect) IsolationOptions(_ context.Context, isolation contracts.SandboxIsolationProfile) ([]string, error) {
+func (Dialect) IsolationOptions(_ context.Context, isolation contracts.SandboxIsolationProfile) ([]string, error) {
 	if isolation == "" {
 		return nil, nil
 	}
 	return nil, fault.New(fault.CodeCapabilityMissing, "Apple container does not support isolation profile %s", isolation)
 }
 
-func (AppleDialect) Name() string                    { return BackendAppleContainer }
-func (AppleDialect) Binary() string                  { return "container" }
-func (AppleDialect) UserOptions(_, _ int) []string   { return nil }
-func (AppleDialect) ListArgs() []string              { return []string{"list", "--all"} }
-func (AppleDialect) DeleteArgs(name string) []string { return []string{"delete", "--force", name} }
-func (AppleDialect) RunOptions(network contracts.SandboxNetworkPolicy) ([]string, error) {
+func (Dialect) Name() string                    { return ocicli.BackendAppleContainer }
+func (Dialect) Binary() string                  { return "container" }
+func (Dialect) UserOptions(_, _ int) []string   { return nil }
+func (Dialect) ListArgs() []string              { return []string{"list", "--all"} }
+func (Dialect) DeleteArgs(name string) []string { return []string{"delete", "--force", name} }
+func (Dialect) RunOptions(network contracts.SandboxNetworkPolicy) ([]string, error) {
 	switch network {
 	case "", contracts.SandboxNetworkDefault:
 		return nil, nil
@@ -34,12 +36,12 @@ func (AppleDialect) RunOptions(network contracts.SandboxNetworkPolicy) ([]string
 		return nil, fault.New(fault.CodeInvalidSpec, "unknown sandbox network policy %s", network)
 	}
 }
-func (AppleDialect) ImageIdentity(ctx context.Context, image string) (string, error) {
+func (Dialect) ImageIdentity(ctx context.Context, image string) (string, error) {
 	ctx, cancel := context.WithTimeout(ctx, 30*time.Second)
 	defer cancel()
 	out, err := exec.CommandContext(ctx, "container", "image", "inspect", image).Output()
 	if err != nil {
-		return "", imageInspectError(ctx, err, image)
+		return "", ocicli.ImageInspectError(ctx, err, image)
 	}
 	var value []struct {
 		Configuration struct {

@@ -117,7 +117,7 @@ func newFixture(t *testing.T) *fixture {
 	env := EnvironmentSpec{SchemaVersion: "turnyard.environment/v1",
 		Sandbox:       SandboxSpec{Backend: "apple-container", Image: "test:latest"},
 		Agents:        []AgentSpec{{ID: "lead", Runtime: "opencode", ModelBinding: "model"}},
-		ModelBindings: []ModelBinding{{ID: "model", Provider: "ollama-cloud", Model: "glm-5.3-flash", CredentialEnv: "OLLAMA_API_KEY"}},
+		ModelBindings: []ModelBinding{{ID: "model", Provider: "ollama-cloud", Model: "glm-5.3-flash", CredentialEnv: "MODEL_API_KEY"}},
 		Git:           GitPolicy{LocalCommits: true, RemoteWrites: "none"},
 		Checks:        []CheckSpec{{ID: "cross", Argv: []string{"go", "version"}, Repositories: []string{"api", "web"}}}}
 	writeJSON(t, filepath.Join(inputs, "session.json"), session)

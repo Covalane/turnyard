@@ -1,4 +1,4 @@
-package sandbox
+package docker
 
 import (
 	"context"
@@ -9,11 +9,13 @@ import (
 
 	"github.com/Covalane/turnyard/internal/contracts"
 	"github.com/Covalane/turnyard/internal/fault"
+	"github.com/Covalane/turnyard/internal/sandbox/ocicli"
 )
 
-type DockerDialect struct{ Executable string }
+// Dialect supplies Docker-specific commands to the shared OCI backend.
+type Dialect struct{ Executable string }
 
-func (d DockerDialect) IsolationOptions(ctx context.Context, isolation contracts.SandboxIsolationProfile) ([]string, error) {
+func (d Dialect) IsolationOptions(ctx context.Context, isolation contracts.SandboxIsolationProfile) ([]string, error) {
 	if isolation == "" {
 		return nil, nil
 	}
@@ -28,7 +30,7 @@ func (d DockerDialect) IsolationOptions(ctx context.Context, isolation contracts
 
 // requireRuntime checks the daemon's registered runtime instead of assuming
 // the client-side runsc binary is sufficient.
-func (d DockerDialect) requireRuntime(ctx context.Context, name string) error {
+func (d Dialect) requireRuntime(ctx context.Context, name string) error {
 	call, cancel := context.WithTimeout(ctx, 15*time.Second)
 	defer cancel()
 	out, err := exec.CommandContext(call, d.Binary(), "info", "--format", "{{json .Runtimes}}").Output()
@@ -45,21 +47,21 @@ func (d DockerDialect) requireRuntime(ctx context.Context, name string) error {
 	return nil
 }
 
-func (d DockerDialect) Name() string { return BackendDocker }
-func (d DockerDialect) Binary() string {
+func (d Dialect) Name() string { return ocicli.BackendDocker }
+func (d Dialect) Binary() string {
 	if d.Executable != "" {
 		return d.Executable
 	}
 	return "docker"
 }
-func (d DockerDialect) ListArgs() []string              { return containerListArgs() }
-func (d DockerDialect) DeleteArgs(name string) []string { return containerDeleteArgs(name) }
-func (d DockerDialect) UserOptions(uid, gid int) []string {
+func (d Dialect) ListArgs() []string              { return ocicli.ListArgs() }
+func (d Dialect) DeleteArgs(name string) []string { return ocicli.DeleteArgs(name) }
+func (d Dialect) UserOptions(uid, gid int) []string {
 	return []string{"--user", fmt.Sprintf("%d:%d", uid, gid)}
 }
-func (d DockerDialect) RunOptions(network contracts.SandboxNetworkPolicy) ([]string, error) {
-	return containerRunOptions(network)
+func (d Dialect) RunOptions(network contracts.SandboxNetworkPolicy) ([]string, error) {
+	return ocicli.RunOptions(network)
 }
-func (d DockerDialect) ImageIdentity(ctx context.Context, image string) (string, error) {
-	return containerImageIdentity(ctx, d.Binary(), image)
+func (d Dialect) ImageIdentity(ctx context.Context, image string) (string, error) {
+	return ocicli.ImageIdentity(ctx, d.Binary(), image)
 }

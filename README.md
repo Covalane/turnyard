@@ -26,9 +26,11 @@ Turnyard 是一个可独立使用的编码代理任务执行器。你用 JSON �
 ```sh
 go build -o bin/turnyard ./cmd/turnyard
 docker build -f Containerfile -t turnyard-agent:dev .
-export OLLAMA_API_KEY='你的 API key'
 bin/turnyard doctor
+export MODEL_API_KEY='你的 API key'
 ```
+
+`doctor` 探测沙箱后端并列出内置代理运行时，不验证代理登录状态，也不枚举宿主机的凭据变量。这里的 `MODEL_API_KEY` 是示例名；可通过生成器的 `--credential` 或 Environment 的 `model_bindings[].credential_env` 使用其他合法变量名。
 
 生成可编辑的 Session、Environment、Work 输入。输出目录必须位于目标仓库之外，且不能已有同名 JSON 文件：
 

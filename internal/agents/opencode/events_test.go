@@ -28,7 +28,7 @@ func TestParseOpenCodeEvents(t *testing.T) {
 
 func TestOpenCodeNoToolSessionGainsInputCapability(t *testing.T) {
 	state := t.TempDir()
-	binding := contracts.ModelBinding{Provider: "ollama-cloud", Model: "glm-5.3-flash", CredentialEnv: "OLLAMA_API_KEY"}
+	binding := contracts.ModelBinding{Provider: "ollama-cloud", Model: "glm-5.3-flash", CredentialEnv: "MODEL_API_KEY"}
 	agent := contracts.AgentSpec{ID: "lead"}
 	if _, err := prepareOpenCode(contracts.EnvironmentSpec{}, agent, binding, state); err != nil {
 		t.Fatal(err)

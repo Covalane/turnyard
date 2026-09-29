@@ -32,7 +32,7 @@ func TestGenerateValidInputsWithoutChangingSource(t *testing.T) {
 		t.Fatal(err)
 	}
 	out := filepath.Join(root, "inputs")
-	if err := generate(source, out, "增加健康检查", "health.go", "docker", "turnyard-agent:0.3.2", "opencode", "ollama-cloud", "glm-5.3-flash", "OLLAMA_API_KEY", "feat: add health check"); err != nil {
+	if err := generate(source, out, "增加健康检查", "health.go", "docker", "turnyard-agent:0.3.2", "opencode", "ollama-cloud", "glm-5.3-flash", "MODEL_API_KEY", "feat: add health check"); err != nil {
 		t.Fatal(err)
 	}
 	session, env, err := contracts.LoadSession(filepath.Join(out, "session.json"))
@@ -49,11 +49,11 @@ func TestGenerateValidInputsWithoutChangingSource(t *testing.T) {
 	if work.CommitMessage != "feat: add health check" {
 		t.Fatalf("commit message not generated: %q", work.CommitMessage)
 	}
-	if err := generate(source, out, "第二次", "", "docker", "turnyard-agent:0.3.2", "opencode", "ollama-cloud", "glm-5.3-flash", "OLLAMA_API_KEY", ""); err == nil {
+	if err := generate(source, out, "第二次", "", "docker", "turnyard-agent:0.3.2", "opencode", "ollama-cloud", "glm-5.3-flash", "MODEL_API_KEY", ""); err == nil {
 		t.Fatal("generator overwrote existing inputs")
 	}
 	bad := filepath.Join(root, "bad-inputs")
-	if err := generate(source, bad, "第二次", "", "docker", "turnyard-agent:0.3.2", "opencode", "ollama-cloud", "glm-5.3-flash", "OLLAMA_API_KEY", "feat: unsafe\ntrailer"); err == nil {
+	if err := generate(source, bad, "第二次", "", "docker", "turnyard-agent:0.3.2", "opencode", "ollama-cloud", "glm-5.3-flash", "MODEL_API_KEY", "feat: unsafe\ntrailer"); err == nil {
 		t.Fatal("generator accepted a multiline commit subject")
 	}
 	if _, err := os.Stat(bad); !os.IsNotExist(err) {

@@ -93,8 +93,9 @@ func TestChatroomWorkflow(t *testing.T) {
 	if os.Getenv("TURNYARD_CHAT_E2E") != "1" {
 		t.Skip("set TURNYARD_CHAT_E2E=1 for a real model run")
 	}
-	if os.Getenv("OLLAMA_API_KEY") == "" {
-		t.Fatal("OLLAMA_API_KEY is required")
+	credentialEnv := os.Getenv("TURNYARD_CHAT_CREDENTIAL_ENV")
+	if credentialEnv == "" || os.Getenv(credentialEnv) == "" {
+		t.Fatal("TURNYARD_CHAT_CREDENTIAL_ENV must name an available model credential")
 	}
 	ctx := context.Background()
 	root, err := filepath.Abs(filepath.Join("..", "..", ".turnyard", "chat-e2e-"+time.Now().Format("20060102-150405")))
@@ -118,15 +119,15 @@ func TestChatroomWorkflow(t *testing.T) {
 	if image == "" {
 		image = "turnyard-agent:dev"
 	}
-	model := os.Getenv("TURNYARD_CHAT_MODEL")
-	if model == "" {
-		model = "glm-5.3-flash"
+	provider, model := os.Getenv("TURNYARD_CHAT_PROVIDER"), os.Getenv("TURNYARD_CHAT_MODEL")
+	if provider == "" || model == "" {
+		t.Fatal("TURNYARD_CHAT_PROVIDER and TURNYARD_CHAT_MODEL are required")
 	}
 	env := contracts.EnvironmentSpec{
 		SchemaVersion: "turnyard.environment/v1",
 		Sandbox:       contracts.SandboxSpec{Backend: backend, Image: image, CPUs: 2, MemoryMB: 2048},
 		Agents:        []contracts.AgentSpec{{ID: "lead", Runtime: "opencode", ModelBinding: "cloud"}},
-		ModelBindings: []contracts.ModelBinding{{ID: "cloud", Provider: "ollama-cloud", Model: model, CredentialEnv: "OLLAMA_API_KEY"}},
+		ModelBindings: []contracts.ModelBinding{{ID: "cloud", Provider: provider, Model: model, CredentialEnv: credentialEnv}},
 		Git:           contracts.GitPolicy{LocalCommits: true, RemoteWrites: "none"},
 		Checks: []contracts.CheckSpec{
 			{ID: "public-chat", Argv: []string{"go", "-C", "/workspace/chat", "test", "-run", "TestPublicChat", "./..."}, Repositories: []string{"chat"}, TimeoutSeconds: 90},

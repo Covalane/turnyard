@@ -28,7 +28,10 @@ Turnyard 的边界是一台机器及其状态目录。上层系统决定任务�
 | `internal/humaninput` | 调用专属的结构化人工输入请求及校验 |
 | `internal/inputs` | 附件下载、快照与运行前摘要复核 |
 | `internal/artifactio` | 由可信环境配置的宿主侧文件传输连接器 |
-| `internal/sandbox` | OCI 后端、挂载、资源限制与容器清理 |
+| `internal/sandbox` | 沙箱契约、共用 OCI 生命周期、挂载、资源限制、Docker 网关协调与容器清理 |
+| `internal/sandbox/{applecontainer,docker,podman}` | 各沙箱后端的 CLI 方言与专属命令选项 |
+| `internal/sandbox/ocicli` | Docker/Podman 共用的 CLI 操作与镜像检查错误分类 |
+| `internal/sandbox/registry` | 显式选择并组装内置沙箱后端 |
 | `internal/gitstate` | 仓库分支、commit、候选版本与检查点归档 |
 | `internal/store` | Ent schema、SQLite 持久化、领域化读写操作与事务；业务层看不到 Ent client 或 SQL 事务 |
 | `internal/observe` | 带上下文关联字段的结构化日志 |
@@ -41,11 +44,11 @@ Turnyard 的边界是一台机器及其状态目录。上层系统决定任务�
 
 `AgentDriver` 负责验证模型绑定、启动与解析一个原生代理；四个实现分别位于 `internal/agents/{claude,codex,kimi,opencode}`，由 `internal/agents/registry` 显式组装，不使用初始化时的隐式注册。新增驱动必须明确如何传递凭据、恢复原生 ID、证明实际模型和报告工具调用。人工输入请求由共用工具处理，不依赖各驱动解析自然语言。
 
-内置模型提供方的端点、凭据名与可用 API 协议集中在 `internal/agents/model_provider.go`；各驱动选择自己支持的协议，保留 CLI 专有的配置和模型证据解析。其他提供方可在可信的 `model_binding.endpoints` 中按 `openai_chat`、`anthropic` 或 `responses` 明确给出 HTTPS 地址和凭据变量，无须修改驱动。内置提供方不接受覆盖端点，避免误把其固定凭据发送到另一个地址。配置可被接受不等于该提供方与模型已通过真实链路验收。
+内置模型提供方的端点与可用 API 协议集中在 `internal/agents/model_provider.go`；凭据环境变量名由每个 `model_binding.credential_env` 选择，运行时按该名称从宿主环境读取。各驱动选择自己支持的协议，保留 CLI 专有的配置和模型证据解析。其他提供方可在可信的 `model_binding.endpoints` 中按 `openai_chat`、`anthropic` 或 `responses` 明确给出 HTTPS 地址，无须修改驱动。内置提供方不接受覆盖端点，避免误把所选凭据发送到另一个地址。配置可被接受不等于该提供方与模型已通过真实链路验收。
 
 环境 JSON Schema 只约束运行时、沙箱、提供方、凭据变量和工具类型的名字格式。会话创建时由 `DriverFactory`、`BackendFactory` 和驱动的能力检查判定这些名字是否真的可用；因此增加新实现不需要把名字写进 Schema 枚举。未安装的实现仍会在创建会话时被拒绝。
 
-`SandboxBackend` 封装探测、配置能力检查、镜像身份、执行和容器清理；OCI 生命周期与挂载策略集中在 `OCIBackend`，Apple `container`、Docker、Podman 各有独立的命令方言，Docker 与 Podman 仅复用兼容的 CLI 操作。Docker/Podman 的代理容器使用 Turnyard 进程的 UID/GID 访问私有挂载；非 root 的 Podman 进程选择 `keep-id` 用户命名空间，rootful Podman 直接使用现有身份映射。Docker 的可选 `isolation: "gvisor"` 在调用代理、检查与原生会话查询时选择 `runsc`，创建会话前检查 Docker daemon 已注册该运行时。gVisor 在 Docker 自定义网络上无法可靠解析网关别名，因此模型网关使用调用专属内网地址写入代理容器的 hosts 映射；不改用宿主网络。新增后端必须保住只读根、仓库权限、Git 元数据保护、资源限制、超时清理和日志脱敏等边界。最终网关已在 Apple `container`、嵌套 Linux 的 Podman 与 gVisor 上通过真实单任务验证；Podman 的 macOS AppleHV 虚拟机仍待复验；gVisor 的标准 cgroup 限额已在嵌套 Linux 环境测量，独立部署主机仍需复验，见[验证记录](validation.md)。
+`SandboxBackend` 封装探测、配置能力检查、镜像身份、执行和容器清理；OCI 生命周期与挂载策略集中在 `OCIBackend`。Apple `container`、Docker、Podman 的 CLI 方言分别位于独立包，由 `internal/sandbox/registry` 显式组装；Docker 与 Podman 仅复用兼容的 CLI 操作。Docker 专用模型与工具网关的启动、清理目前仍由共享 OCI 执行流程协调。新增 OCI 后端需实现 `Dialect` 并在注册表中接入；若某后端无法满足共用生命周期的假设，则应独立实现 `SandboxBackend`，而不是把例外塞进所有方言。Docker/Podman 的代理容器使用 Turnyard 进程的 UID/GID 访问私有挂载；非 root 的 Podman 进程选择 `keep-id` 用户命名空间，rootful Podman 直接使用现有身份映射。Docker 的可选 `isolation: "gvisor"` 在调用代理、检查与原生会话查询时选择 `runsc`，创建会话前检查 Docker daemon 已注册该运行时。gVisor 在 Docker 自定义网络上无法可靠解析网关别名，因此模型网关使用调用专属内网地址写入代理容器的 hosts 映射；不改用宿主网络。新增后端必须保住只读根、仓库权限、Git 元数据保护、资源限制、超时清理和日志脱敏等边界。最终网关已在 Apple `container`、嵌套 Linux 的 Podman 与 gVisor 上通过真实单任务验证；Podman 的 macOS AppleHV 虚拟机仍待复验；gVisor 的标准 cgroup 限额已在嵌套 Linux 环境测量，独立部署主机仍需复验，见[验证记录](validation.md)。
 
 `engine` 不持有 SQL 句柄或事务对象；会话、调用、候选与检查点的原子操作由 `store` 实现。OCI 生命周期与挂载策略位于 `sandbox`，命令方言由 `Dialect` 隔离。代理驱动共用调用准备与主进程判定，每种 CLI 保留自己的配置、原生续接和证据解析。错误及关联 ID 的处理见[错误与可观测性](observability.md)。
 

@@ -6,7 +6,6 @@ import (
 	"time"
 
 	"github.com/Covalane/turnyard/internal/contracts"
-	"github.com/Covalane/turnyard/internal/fault"
 )
 
 // SandboxBackend owns container lifecycle and host mounts. Agent drivers
@@ -81,16 +80,4 @@ func placeholderCredentials(source map[string]string) map[string]string {
 		result[name] = ModelCredentialPlaceholder
 	}
 	return result
-}
-func Backend(name string) (SandboxBackend, error) {
-	switch name {
-	case BackendAppleContainer:
-		return NewOCIBackend(AppleDialect{}), nil
-	case BackendDocker:
-		return NewOCIBackend(DockerDialect{}), nil
-	case BackendPodman:
-		return NewOCIBackend(PodmanDialect{}), nil
-	default:
-		return nil, fault.New(fault.CodeSandboxUnavailable, "unknown sandbox backend %s", name)
-	}
 }

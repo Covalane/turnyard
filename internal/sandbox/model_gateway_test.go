@@ -7,10 +7,12 @@ import (
 
 	"github.com/Covalane/turnyard/internal/contracts"
 	"github.com/Covalane/turnyard/internal/fault"
+	"github.com/Covalane/turnyard/internal/sandbox/applecontainer"
+	"github.com/Covalane/turnyard/internal/sandbox/docker"
 )
 
 func TestModelGatewayRejectsRealAgentCredentialBeforeStarting(t *testing.T) {
-	backend := NewOCIBackend(DockerDialect{Executable: "docker"})
+	backend := NewOCIBackend(docker.Dialect{Executable: "docker"})
 	_, err := backend.Run(context.Background(), SandboxRun{Sandbox: contracts.SandboxSpec{Network: contracts.SandboxNetworkModelOnly},
 		Credentials: map[string]string{"MODEL_KEY": "real-secret"}, ModelGateway: &ModelGateway{Endpoint: "https://example.org", Credential: "real-secret"}})
 	if fault.CodeOf(err) != fault.CodeInvalidSpec {
@@ -31,10 +33,10 @@ func TestGatewayResourceMissingRecognizesOnlyNamedResource(t *testing.T) {
 }
 
 func TestUnknownNetworkPolicyFailsClosed(t *testing.T) {
-	if _, err := (DockerDialect{}).RunOptions("typo-open"); fault.CodeOf(err) != fault.CodeInvalidSpec {
+	if _, err := (docker.Dialect{}).RunOptions("typo-open"); fault.CodeOf(err) != fault.CodeInvalidSpec {
 		t.Fatalf("Docker accepted unknown network policy: %v", err)
 	}
-	if _, err := (AppleDialect{}).RunOptions(contracts.SandboxNetworkModelOnly); fault.CodeOf(err) != fault.CodeCapabilityMissing {
+	if _, err := (applecontainer.Dialect{}).RunOptions(contracts.SandboxNetworkModelOnly); fault.CodeOf(err) != fault.CodeCapabilityMissing {
 		t.Fatalf("Apple accepted unavailable network isolation: %v", err)
 	}
 }
