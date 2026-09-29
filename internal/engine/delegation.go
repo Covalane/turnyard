@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/Covalane/turnyard/internal/agents"
+	"github.com/Covalane/turnyard/internal/collections"
 	"github.com/Covalane/turnyard/internal/contracts"
 	"github.com/Covalane/turnyard/internal/fault"
 	"github.com/Covalane/turnyard/internal/gitstate"
@@ -184,13 +185,13 @@ func (d *delegationServer) submit(ctx context.Context, key string, req delegatio
 		for _, item := range d.parent.work.Inputs {
 			inputs[item.ID] = item
 		}
-		seen := map[string]bool{}
+		seen := collections.Set[string]{}
 		for _, id := range req.InputIDs {
 			item, ok := inputs[id]
-			if !ok || seen[id] {
+			if !ok || seen.Has(id) {
 				return nil, fault.New(fault.CodeInvalidSpec, "invalid delegated input %s", id)
 			}
-			seen[id] = true
+			seen.Add(id)
 			work.Inputs = append(work.Inputs, contracts.InputSpec{ID: id, ExpectedSHA256: item.ExpectedSHA256,
 				MediaType: item.MediaType, Source: contracts.InputSource{Kind: contracts.InputFile,
 					Path: filepath.Join(filepath.Dir(d.parent.workspace), "inputs", filepath.FromSlash(item.Source.Path))}})
@@ -228,12 +229,12 @@ func (d *delegationServer) validateScope(scope []contracts.ScopeRepo) error {
 	if len(scope) != len(parent) {
 		return fault.New(fault.CodeScopeViolation, "delegation must name every parent repository")
 	}
-	seen := map[string]bool{}
+	seen := collections.Set[string]{}
 	for _, item := range scope {
-		if seen[item.ID] || !parent.allows(item) {
+		if seen.Has(item.ID) || !parent.allows(item) {
 			return fault.New(fault.CodeScopeViolation, "delegation exceeds parent repository scope")
 		}
-		seen[item.ID] = true
+		seen.Add(item.ID)
 	}
 	return nil
 }
@@ -337,14 +338,10 @@ func (d *delegationServer) continueTask(ctx context.Context, key string, req del
 
 func (d *delegationServer) runChild(taskID, reply string, retry bool, seconds int) bool {
 	d.service.delegationMu.Lock()
-	if d.service.activeChildTasks == nil {
-		d.service.activeChildTasks = map[string]bool{}
-	}
-	if d.service.activeChildTasks[taskID] {
+	if !d.service.activeChildTasks.Add(taskID) {
 		d.service.delegationMu.Unlock()
 		return false
 	}
-	d.service.activeChildTasks[taskID] = true
 	d.service.delegationMu.Unlock()
 	if seconds == 0 {
 		seconds = 900
@@ -357,7 +354,7 @@ func (d *delegationServer) runChild(taskID, reply string, retry bool, seconds in
 		defer d.service.activeDelegations.Add(-1)
 		defer func() {
 			d.service.delegationMu.Lock()
-			delete(d.service.activeChildTasks, taskID)
+			d.service.activeChildTasks.Remove(taskID)
 			d.service.delegationMu.Unlock()
 		}()
 		ctx := observe.WithIDs(context.Background(), observe.IDs{TaskID: taskID})

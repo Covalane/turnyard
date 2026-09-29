@@ -7,14 +7,15 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/Covalane/turnyard/internal/collections"
 	"github.com/Covalane/turnyard/internal/contracts"
 	"github.com/Covalane/turnyard/internal/store/ent/task"
 )
 
 // ReferencedInputBatches returns the attachment batches owned by persisted
 // tasks. Startup cleanup uses this read-only view before accepting requests.
-func (s *Store) ReferencedInputBatches(ctx context.Context) (map[string]bool, error) {
-	refs := make(map[string]bool)
+func (s *Store) ReferencedInputBatches(ctx context.Context) (collections.Set[string], error) {
+	refs := collections.NewSet[string](0)
 	const pageSize = 256
 	after := ""
 	for {
@@ -40,7 +41,7 @@ func (s *Store) ReferencedInputBatches(ctx context.Context) (map[string]bool, er
 				if decodeErr != nil || hex.EncodeToString(decoded) != batch {
 					return nil, fmt.Errorf("persisted task %s has invalid input snapshot path", item.ID)
 				}
-				refs[item.SessionID+"/"+batch] = true
+				refs.Add(item.SessionID + "/" + batch)
 			}
 		}
 		if len(tasks) < pageSize {

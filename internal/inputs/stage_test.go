@@ -8,6 +8,7 @@ import (
 	"path/filepath"
 	"testing"
 
+	"github.com/Covalane/turnyard/internal/collections"
 	"github.com/Covalane/turnyard/internal/contracts"
 )
 
@@ -70,7 +71,7 @@ func TestPruneOrphanedKeepsCommittedBatches(t *testing.T) {
 			t.Fatal(err)
 		}
 	}
-	removed, err := PruneOrphaned(context.Background(), root, map[string]bool{session + "/" + committed: true})
+	removed, err := PruneOrphaned(context.Background(), root, collections.SetOf(session+"/"+committed))
 	if err != nil || removed != 1 {
 		t.Fatalf("pruned %d batches: %v", removed, err)
 	}

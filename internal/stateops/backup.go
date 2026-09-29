@@ -17,6 +17,7 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/Covalane/turnyard/internal/collections"
 	"github.com/Covalane/turnyard/internal/store"
 )
 
@@ -249,17 +250,17 @@ func Verify(ctx context.Context, backup string) (Manifest, error) {
 	if manifest.Format != backupFormat || manifest.Source == "" || manifest.CreatedAt == "" {
 		return Manifest{}, fmt.Errorf("unsupported backup manifest")
 	}
-	seen := map[string]bool{}
+	seen := collections.Set[string]{}
 	for _, entry := range manifest.Entries {
 		if err := ctx.Err(); err != nil {
 			return Manifest{}, err
 		}
 		name := filepath.FromSlash(entry.Path)
 		if name == "." || filepath.IsAbs(name) || name == manifestName || name == lockName ||
-			name != filepath.Clean(name) || name == ".." || strings.HasPrefix(name, ".."+string(filepath.Separator)) || seen[name] {
+			name != filepath.Clean(name) || name == ".." || strings.HasPrefix(name, ".."+string(filepath.Separator)) || seen.Has(name) {
 			return Manifest{}, fmt.Errorf("invalid backup entry: %s", entry.Path)
 		}
-		seen[name] = true
+		seen.Add(name)
 		path := filepath.Join(backup, name)
 		info, err := os.Lstat(path)
 		if err != nil {
@@ -295,7 +296,7 @@ func Verify(ctx context.Context, backup string) (Manifest, error) {
 		if err != nil || rel == "." || rel == manifestName {
 			return err
 		}
-		if !seen[rel] {
+		if !seen.Has(rel) {
 			return fmt.Errorf("unlisted backup entry: %s", rel)
 		}
 		return nil
@@ -329,13 +330,13 @@ func VerifyCurrent(ctx context.Context, home, backup string) error {
 	if home != manifest.Source {
 		return fmt.Errorf("backup was created for a different state directory")
 	}
-	seen := map[string]bool{}
+	seen := collections.Set[string]{}
 	for _, entry := range manifest.Entries {
 		if err := ctx.Err(); err != nil {
 			return err
 		}
 		path := filepath.Join(home, filepath.FromSlash(entry.Path))
-		seen[filepath.FromSlash(entry.Path)] = true
+		seen.Add(filepath.FromSlash(entry.Path))
 		info, err := os.Lstat(path)
 		if err != nil {
 			return err
@@ -368,7 +369,7 @@ func VerifyCurrent(ctx context.Context, home, backup string) error {
 		if err != nil || rel == "." || rel == lockName {
 			return err
 		}
-		if !seen[rel] {
+		if !seen.Has(rel) {
 			return fmt.Errorf("state gained a file after backup: %s", rel)
 		}
 		return nil

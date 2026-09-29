@@ -11,6 +11,8 @@ import (
 	"os"
 	"strings"
 	"time"
+
+	"github.com/Covalane/turnyard/internal/collections"
 )
 
 // MaxModelCandidates bounds model prompt size. A larger registry needs a
@@ -57,14 +59,14 @@ func (m *LLMMatcher) Rank(ctx context.Context, query string, tools []candidate) 
 		Description string `json:"description"`
 	}
 	items := make([]descriptor, 0, len(tools))
-	granted := make(map[string]bool, len(tools))
+	granted := collections.NewSet[string](len(tools))
 	for _, item := range tools {
 		description := item.Description
 		if len(description) > 500 {
 			description = description[:500]
 		}
 		items = append(items, descriptor{ID: item.ID, Description: description})
-		granted[item.ID] = true
+		granted.Add(item.ID)
 	}
 	catalog, err := json.Marshal(items)
 	if err != nil {
@@ -118,11 +120,10 @@ func (m *LLMMatcher) Rank(ctx context.Context, query string, tools []candidate) 
 		return nil, fmt.Errorf("decode tool search ranking: %w", err)
 	}
 	ids := make([]string, 0, len(ranking.IDs))
-	seen := make(map[string]bool)
+	seen := collections.NewSet[string](0)
 	for _, id := range ranking.IDs {
-		if granted[id] && !seen[id] {
+		if granted.Has(id) && seen.Add(id) {
 			ids = append(ids, id)
-			seen[id] = true
 		}
 	}
 	return ids, nil

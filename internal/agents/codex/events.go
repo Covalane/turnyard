@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	"github.com/Covalane/turnyard/internal/agents"
+	"github.com/Covalane/turnyard/internal/collections"
 	"github.com/Covalane/turnyard/internal/fault"
 )
 
@@ -26,9 +27,9 @@ type codexEvent struct {
 
 func parseCodexEvents(raw string) (agents.AgentResult, error) {
 	result := agents.AgentResult{}
-	ids := map[string]bool{}
-	loadedSkills := map[string]bool{}
-	calledTools := map[string]bool{}
+	ids := collections.Set[string]{}
+	loadedSkills := collections.Set[string]{}
+	calledTools := collections.Set[string]{}
 	completed := false
 	for _, line := range strings.Split(raw, "\n") {
 		var event codexEvent
@@ -39,7 +40,7 @@ func parseCodexEvents(raw string) (agents.AgentResult, error) {
 		switch event.Type {
 		case "thread.started":
 			if event.ThreadID != "" {
-				ids[event.ThreadID] = true
+				ids.Add(event.ThreadID)
 			}
 		case "turn.completed":
 			completed = true
@@ -52,11 +53,11 @@ func parseCodexEvents(raw string) (agents.AgentResult, error) {
 		switch event.Item.Type {
 		case "command_execution":
 			for _, match := range codexSkillPath.FindAllStringSubmatch(event.Item.Command, -1) {
-				loadedSkills[match[1]] = true
+				loadedSkills.Add(match[1])
 			}
 		case "mcp_tool_call":
 			if event.Item.Server != "" && event.Item.Tool != "" {
-				calledTools["mcp__"+event.Item.Server+"__"+event.Item.Tool] = true
+				calledTools.Add("mcp__" + event.Item.Server + "__" + event.Item.Tool)
 			}
 		}
 	}

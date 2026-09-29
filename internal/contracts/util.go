@@ -10,6 +10,7 @@ import (
 	"path/filepath"
 	"sort"
 
+	"github.com/Covalane/turnyard/internal/collections"
 	"github.com/Covalane/turnyard/internal/fault"
 )
 
@@ -62,12 +63,11 @@ func FileDigest(path string) (string, error) {
 }
 
 func uniqueIDs(ids []string, label string) error {
-	seen := map[string]bool{}
+	seen := collections.Set[string]{}
 	for _, id := range ids {
-		if seen[id] {
+		if !seen.Add(id) {
 			return fault.New(fault.CodeInvalidSpec, "duplicate %s ID: %s", label, id)
 		}
-		seen[id] = true
 	}
 	return nil
 }

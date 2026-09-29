@@ -3,6 +3,7 @@ package registry
 import (
 	"testing"
 
+	"github.com/Covalane/turnyard/internal/collections"
 	"github.com/Covalane/turnyard/internal/fault"
 )
 
@@ -11,12 +12,12 @@ func TestBuiltinBackendsResolve(t *testing.T) {
 	if len(names) != len(factories) {
 		t.Fatalf("listed backends=%d; registered=%d", len(names), len(factories))
 	}
-	seen := make(map[string]bool, len(names))
+	seen := collections.NewSet[string](len(names))
 	for _, name := range names {
-		if seen[name] {
+		if seen.Has(name) {
 			t.Fatalf("duplicate backend %q", name)
 		}
-		seen[name] = true
+		seen.Add(name)
 		backend, err := Backend(name)
 		if err != nil || backend.Name() != name {
 			t.Fatalf("backend %q resolved to %v: %v", name, backend, err)

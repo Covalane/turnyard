@@ -5,6 +5,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/Covalane/turnyard/internal/collections"
 	"github.com/Covalane/turnyard/internal/contracts"
 	"github.com/Covalane/turnyard/internal/fault"
 	"github.com/Covalane/turnyard/internal/sandbox"
@@ -65,7 +66,7 @@ type Capacity struct {
 	cpus               int
 	memory             int
 	waiters            []*capacityWaiter
-	parents            map[*capacityWaiter]bool
+	parents            collections.Set[*capacityWaiter]
 	preparations       chan struct{}
 	preparationMu      sync.Mutex
 	preparationWaiters int
@@ -81,7 +82,7 @@ func NewCapacity(limits CapacityLimits) (*Capacity, error) {
 	if limits.MaxTasks < 1 || limits.MaxPreparations < 1 || limits.MaxPendingPreparations < 1 || limits.MaxCPUs < 0 || limits.MaxMemoryMB < 0 || limits.QueueWait <= 0 {
 		return nil, fault.New(fault.CodeInvalidSpec, "invalid supervisor capacity limits")
 	}
-	return &Capacity{limits: limits, parents: map[*capacityWaiter]bool{}, preparations: make(chan struct{}, limits.MaxPreparations)}, nil
+	return &Capacity{limits: limits, preparations: make(chan struct{}, limits.MaxPreparations)}, nil
 }
 
 func (c *Capacity) Status() CapacityStatus {
@@ -202,7 +203,7 @@ func (c *Capacity) dispatch() {
 		c.cpus += w.cpus
 		c.memory += w.memory
 		if w.kind == CapacityDelegating {
-			c.parents[w] = true
+			c.parents.Add(w)
 		}
 		w.granted = true
 		close(w.ready)
@@ -235,7 +236,7 @@ func (c *Capacity) unreserve(w *capacityWaiter) {
 	c.active--
 	c.cpus -= w.cpus
 	c.memory -= w.memory
-	delete(c.parents, w)
+	c.parents.Remove(w)
 }
 
 func (c *Capacity) releaseFunc(w *capacityWaiter) func() {

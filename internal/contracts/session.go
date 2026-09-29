@@ -5,6 +5,7 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/Covalane/turnyard/internal/collections"
 	"github.com/Covalane/turnyard/internal/fault"
 )
 
@@ -52,13 +53,13 @@ func LoadSession(path string) (SessionSpec, EnvironmentSpec, error) {
 		return session, env, err
 	}
 	ids = ids[:0]
-	models := map[string]bool{}
-	agents := map[string]bool{}
-	skills := map[string]bool{}
-	tools := map[string]bool{}
+	models := collections.Set[string]{}
+	agents := collections.Set[string]{}
+	skills := collections.Set[string]{}
+	tools := collections.Set[string]{}
 	for _, m := range env.ModelBindings {
 		ids = append(ids, m.ID)
-		models[m.ID] = true
+		models.Add(m.ID)
 		for _, endpoint := range []string{m.Endpoints.OpenAIChat, m.Endpoints.Anthropic, m.Endpoints.Responses} {
 			if endpoint != "" && !ValidModelEndpoint(endpoint) {
 				return session, env, fault.New(fault.CodeInvalidSpec, "model binding %s has an invalid HTTPS endpoint", m.ID)
@@ -69,7 +70,7 @@ func LoadSession(path string) (SessionSpec, EnvironmentSpec, error) {
 		return session, env, err
 	}
 	if search := env.ToolSearch; search != nil {
-		if search.Mode == ToolSearchLLMRerank && !models[search.ModelBinding] {
+		if search.Mode == ToolSearchLLMRerank && !models.Has(search.ModelBinding) {
 			return session, env, fault.New(fault.CodeInvalidSpec, "tool search references missing model binding")
 		}
 		if search.Mode == ToolSearchLexical && search.ModelBinding != "" {
@@ -79,33 +80,33 @@ func LoadSession(path string) (SessionSpec, EnvironmentSpec, error) {
 	ids = ids[:0]
 	for _, a := range env.Agents {
 		ids = append(ids, a.ID)
-		agents[a.ID] = true
+		agents.Add(a.ID)
 	}
 	if err := uniqueIDs(ids, "agent"); err != nil {
 		return session, env, err
 	}
-	if !agents[session.PrimaryAgent] {
+	if !agents.Has(session.PrimaryAgent) {
 		return session, env, fault.New(fault.CodeInvalidSpec, "primaryAgent does not exist")
 	}
 	for _, a := range env.Agents {
-		if !models[a.ModelBinding] {
+		if !models.Has(a.ModelBinding) {
 			return session, env, fault.New(fault.CodeInvalidSpec, "agent %s references missing model", a.ID)
 		}
 		for _, child := range a.Delegates {
-			if child == a.ID || !agents[child] {
+			if child == a.ID || !agents.Has(child) {
 				return session, env, fault.New(fault.CodeInvalidSpec, "agent %s references invalid delegate %s", a.ID, child)
 			}
 		}
 	}
 	ids = ids[:0]
-	repositoryIDs := map[string]bool{}
+	repositoryIDs := collections.Set[string]{}
 	for _, repository := range session.Repositories {
-		repositoryIDs[repository.ID] = true
+		repositoryIDs.Add(repository.ID)
 	}
 	for _, c := range env.Checks {
 		ids = append(ids, c.ID)
 		for _, repositoryID := range c.Repositories {
-			if !repositoryIDs[repositoryID] {
+			if !repositoryIDs.Has(repositoryID) {
 				return session, env, fault.New(fault.CodeInvalidSpec, "check %s references missing repository %s", c.ID, repositoryID)
 			}
 		}
@@ -117,7 +118,7 @@ func LoadSession(path string) (SessionSpec, EnvironmentSpec, error) {
 	for i := range env.Skills {
 		s := &env.Skills[i]
 		ids = append(ids, s.ID)
-		skills[s.ID] = true
+		skills.Add(s.ID)
 		s.Path, err = resolvePath(filepath.Dir(envPath), s.Path)
 		if err != nil {
 			return session, env, err
@@ -144,7 +145,7 @@ func LoadSession(path string) (SessionSpec, EnvironmentSpec, error) {
 			return session, env, fault.New(fault.CodeInvalidSpec, "tool ID %s is reserved", DelegationToolID)
 		}
 		ids = append(ids, t.ID)
-		tools[t.ID] = true
+		tools.Add(t.ID)
 		if t.Kind != ToolKindMCP && t.Kind != ToolKindExecutable {
 			return session, env, fault.New(fault.CodeInvalidSpec, "tool %s has unsupported kind %s", t.ID, t.Kind)
 		}
@@ -175,12 +176,12 @@ func LoadSession(path string) (SessionSpec, EnvironmentSpec, error) {
 	}
 	for _, a := range env.Agents {
 		for _, id := range a.Skills {
-			if !skills[id] {
+			if !skills.Has(id) {
 				return session, env, fault.New(fault.CodeInvalidSpec, "agent %s references missing skill %s", a.ID, id)
 			}
 		}
 		for _, id := range a.Tools {
-			if !tools[id] {
+			if !tools.Has(id) {
 				return session, env, fault.New(fault.CodeInvalidSpec, "agent %s references missing tool %s", a.ID, id)
 			}
 		}

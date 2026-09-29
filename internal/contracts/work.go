@@ -10,6 +10,7 @@ import (
 	"unicode"
 	"unicode/utf8"
 
+	"github.com/Covalane/turnyard/internal/collections"
 	"github.com/Covalane/turnyard/internal/fault"
 )
 
@@ -44,10 +45,10 @@ func ValidateWorkSpec(work WorkSpec, session SessionSpec, env EnvironmentSpec) (
 		return work, fault.New(fault.CodeInvalidSpec, "work requires at least one trusted check or deliverable")
 	}
 	ids := []string{}
-	seen := map[string]bool{}
+	seen := collections.Set[string]{}
 	for _, r := range work.Scope.Repositories {
 		ids = append(ids, r.ID)
-		seen[r.ID] = true
+		seen.Add(r.ID)
 	}
 	if err := uniqueIDs(ids, "scope repository"); err != nil {
 		return work, err
@@ -56,33 +57,34 @@ func ValidateWorkSpec(work WorkSpec, session SessionSpec, env EnvironmentSpec) (
 		return work, fault.New(fault.CodeInvalidSpec, "scope must name every repository")
 	}
 	for _, r := range session.Repositories {
-		if !seen[r.ID] {
+		if !seen.Has(r.ID) {
 			return work, fault.New(fault.CodeInvalidSpec, "scope missing repository %s", r.ID)
 		}
 	}
-	checks := map[string]bool{}
+	checks := collections.Set[string]{}
 	for _, c := range env.Checks {
-		checks[c.ID] = true
+		checks.Add(c.ID)
 	}
 	for _, id := range work.Checks {
-		if !checks[id] {
+		if !checks.Has(id) {
 			return work, fault.New(fault.CodeInvalidSpec, "unknown trusted check: %s", id)
 		}
 	}
-	writable := map[string]bool{}
+	writable := collections.Set[string]{}
 	for _, r := range work.Scope.Repositories {
-		writable[r.ID] = r.Mode == ScopeWrite
+		if r.Mode == ScopeWrite {
+			writable.Add(r.ID)
+		}
 	}
 	connectors := connectorCatalog{}
 	for _, connector := range env.ArtifactConnectors {
 		connectors[connector.ID] = connector
 	}
-	inputIDs := map[string]bool{}
+	inputIDs := collections.Set[string]{}
 	for _, input := range work.Inputs {
-		if inputIDs[input.ID] {
+		if !inputIDs.Add(input.ID) {
 			return work, fault.New(fault.CodeInvalidSpec, "duplicate input ID: %s", input.ID)
 		}
-		inputIDs[input.ID] = true
 		if input.ExpectedSHA256 != "" && !sha256Pattern.MatchString(input.ExpectedSHA256) {
 			return work, fault.New(fault.CodeInvalidSpec, "input %s has an invalid SHA-256", input.ID)
 		}
@@ -115,12 +117,11 @@ func ValidateWorkSpec(work WorkSpec, session SessionSpec, env EnvironmentSpec) (
 			return work, fault.New(fault.CodeInvalidSpec, "input %s has unsupported source", input.ID)
 		}
 	}
-	outputIDs, outputPaths := map[string]bool{}, map[string]bool{}
+	outputIDs, outputPaths := collections.Set[string]{}, collections.Set[string]{}
 	for _, item := range work.Deliverables {
-		if outputIDs[item.ID] {
+		if !outputIDs.Add(item.ID) {
 			return work, fault.New(fault.CodeInvalidSpec, "duplicate deliverable ID: %s", item.ID)
 		}
-		outputIDs[item.ID] = true
 		if item.ExpectedSHA256 != "" && !sha256Pattern.MatchString(item.ExpectedSHA256) {
 			return work, fault.New(fault.CodeInvalidSpec, "deliverable %s has an invalid SHA-256", item.ID)
 		}
@@ -129,17 +130,16 @@ func ValidateWorkSpec(work WorkSpec, session SessionSpec, env EnvironmentSpec) (
 		}
 		switch item.Kind {
 		case DeliverableFile, DeliverableImage:
-			if item.Repository != "" && !writable[item.Repository] {
+			if item.Repository != "" && !writable.Has(item.Repository) {
 				return work, fault.New(fault.CodeInvalidSpec, "deliverable %s requires a writable repository", item.ID)
 			}
 			if !safeDeliverablePath(item.Path) {
 				return work, fault.New(fault.CodeInvalidSpec, "deliverable %s has an unsafe path", item.ID)
 			}
 			key := item.Repository + ":" + item.Path
-			if outputPaths[key] {
+			if !outputPaths.Add(key) {
 				return work, fault.New(fault.CodeInvalidSpec, "duplicate deliverable path: %s", key)
 			}
-			outputPaths[key] = true
 			if item.Repository == "" && item.Destination == nil {
 				return work, fault.New(fault.CodeInvalidSpec, "deliverable %s outside Git requires a destination", item.ID)
 			}
@@ -155,7 +155,7 @@ func ValidateWorkSpec(work WorkSpec, session SessionSpec, env EnvironmentSpec) (
 				return work, fault.New(fault.CodeInvalidSpec, "text deliverable %s has incompatible fields", item.ID)
 			}
 		case DeliverablePullRequest:
-			if !writable[item.Repository] || item.Path != "" || item.ExpectedSHA256 != "" || item.MediaType != "" || item.Destination != nil || !safeBranchName(item.Base) {
+			if !writable.Has(item.Repository) || item.Path != "" || item.ExpectedSHA256 != "" || item.MediaType != "" || item.Destination != nil || !safeBranchName(item.Base) {
 				return work, fault.New(fault.CodeInvalidSpec, "pull request deliverable %s has invalid fields", item.ID)
 			}
 		default:

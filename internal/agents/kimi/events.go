@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	"github.com/Covalane/turnyard/internal/agents"
+	"github.com/Covalane/turnyard/internal/collections"
 	"github.com/Covalane/turnyard/internal/fault"
 )
 
@@ -68,8 +69,8 @@ func verifyKimiModel(state, native, expected string) error {
 
 func parseKimiEvents(raw string) ([]json.RawMessage, []string, []string) {
 	events := []json.RawMessage{}
-	called := map[string]bool{}
-	loaded := map[string]bool{}
+	called := collections.Set[string]{}
+	loaded := collections.Set[string]{}
 	for _, line := range strings.Split(raw, "\n") {
 		var event kimiEvent
 		if json.Unmarshal([]byte(line), &event) != nil {
@@ -84,7 +85,7 @@ func parseKimiEvents(raw string) ([]json.RawMessage, []string, []string) {
 			if name == "" {
 				continue
 			}
-			called[name] = true
+			called.Add(name)
 			if name != "Skill" {
 				continue
 			}
@@ -92,7 +93,7 @@ func parseKimiEvents(raw string) ([]json.RawMessage, []string, []string) {
 				Skill string `json:"skill"`
 			}
 			if json.Unmarshal([]byte(call.Function.Arguments), &args) == nil && args.Skill != "" {
-				loaded[args.Skill] = true
+				loaded.Add(args.Skill)
 			}
 		}
 	}

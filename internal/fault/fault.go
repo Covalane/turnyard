@@ -8,6 +8,8 @@ import (
 	"strings"
 
 	crerrors "github.com/cockroachdb/errors"
+
+	"github.com/Covalane/turnyard/internal/collections"
 )
 
 // Code is a stable machine-readable failure category, independent of text.
@@ -187,7 +189,7 @@ func Operations(err error) []string {
 // Sites lists captured locations across wrappers and joined cleanup errors.
 func Sites(err error) []string {
 	var sites []string
-	seen := map[string]bool{}
+	seen := collections.Set[string]{}
 	walk(err, func(current error) {
 		typed, ok := current.(*Error)
 		if !ok || typed.Trace == nil {
@@ -214,8 +216,7 @@ func Sites(err error) []string {
 			path = filepath.Base(path)
 		}
 		site := fmt.Sprintf("%s:%d", path, frame.Lineno)
-		if !seen[site] {
-			seen[site] = true
+		if seen.Add(site) {
 			sites = append(sites, site)
 		}
 	})

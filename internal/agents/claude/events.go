@@ -5,6 +5,7 @@ import (
 	"strings"
 
 	"github.com/Covalane/turnyard/internal/agents"
+	"github.com/Covalane/turnyard/internal/collections"
 	"github.com/Covalane/turnyard/internal/fault"
 )
 
@@ -26,9 +27,9 @@ type claudeEvent struct {
 
 func parseClaudeEvents(raw string, expected string) (agents.AgentResult, error) {
 	result := agents.AgentResult{}
-	models := map[string]bool{}
-	ids := map[string]bool{}
-	loaded := map[string]bool{}
+	models := collections.Set[string]{}
+	ids := collections.Set[string]{}
+	loaded := collections.Set[string]{}
 	completed := false
 	for _, line := range strings.Split(raw, "\n") {
 		var event claudeEvent
@@ -37,12 +38,12 @@ func parseClaudeEvents(raw string, expected string) (agents.AgentResult, error) 
 		}
 		result.Events = append(result.Events, json.RawMessage(line))
 		if event.SessionID != "" {
-			ids[event.SessionID] = true
+			ids.Add(event.SessionID)
 		}
 		switch event.Type {
 		case "assistant":
 			if event.Message.Model != "" {
-				models[event.Message.Model] = true
+				models.Add(event.Message.Model)
 			}
 			for _, part := range event.Message.Content {
 				switch part.Type {
@@ -52,7 +53,7 @@ func parseClaudeEvents(raw string, expected string) (agents.AgentResult, error) 
 					}
 					result.CalledTools = append(result.CalledTools, part.Name)
 					if part.Name == "Skill" && part.Input.Skill != "" {
-						loaded[part.Input.Skill] = true
+						loaded.Add(part.Input.Skill)
 					}
 				}
 			}

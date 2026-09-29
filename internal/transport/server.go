@@ -13,6 +13,7 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/Covalane/turnyard/internal/collections"
 	"github.com/Covalane/turnyard/internal/contracts"
 	"github.com/Covalane/turnyard/internal/engine"
 	"github.com/Covalane/turnyard/internal/fault"
@@ -53,7 +54,7 @@ func SocketPath(home string) string {
 type Supervisor struct {
 	Service        *engine.Service
 	mu             sync.Mutex
-	active         map[string]bool
+	active         collections.Set[string]
 	requests       int
 	listener       net.Listener
 	stopping       atomic.Bool
@@ -100,7 +101,7 @@ func NewSupervisor(ctx context.Context, home string) (*Supervisor, error) {
 			}
 		}
 	}
-	return &Supervisor{Service: service, active: map[string]bool{}, stateWarnBytes: warnBytes}, nil
+	return &Supervisor{Service: service, stateWarnBytes: warnBytes}, nil
 }
 func (s *Supervisor) schedule(ctx context.Context, tid, reply string, retry bool, timeout int) (map[string]any, error) {
 	ctx = observe.WithIDs(ctx, observe.IDs{TaskID: tid})
@@ -131,17 +132,16 @@ func (s *Supervisor) schedule(ctx context.Context, tid, reply string, retry bool
 		return nil, fault.New(fault.CodeInvalidTransition, "task is %s", task.Status)
 	}
 	s.mu.Lock()
-	if s.active[task.SessionID] {
+	if !s.active.Add(task.SessionID) {
 		s.mu.Unlock()
 		return nil, fault.New(fault.CodeConcurrentRun, "session already has active work")
 	}
-	s.active[task.SessionID] = true
 	s.mu.Unlock()
 	runCtx := context.WithoutCancel(observe.WithIDs(ctx, observe.IDs{SessionID: task.SessionID, TaskID: tid}))
 	go func() {
 		defer func() {
 			s.mu.Lock()
-			delete(s.active, task.SessionID)
+			s.active.Remove(task.SessionID)
 			s.mu.Unlock()
 		}()
 		started := time.Now()
@@ -165,17 +165,16 @@ func (s *Supervisor) scheduleVerify(ctx context.Context, tid string) (map[string
 		return nil, fault.New(fault.CodeInvalidTransition, "task has no failed candidate")
 	}
 	s.mu.Lock()
-	if s.active[task.SessionID] {
+	if !s.active.Add(task.SessionID) {
 		s.mu.Unlock()
 		return nil, fault.New(fault.CodeConcurrentRun, "session already has active work")
 	}
-	s.active[task.SessionID] = true
 	s.mu.Unlock()
 	runCtx := context.WithoutCancel(observe.WithIDs(ctx, observe.IDs{SessionID: task.SessionID, TaskID: tid}))
 	go func() {
 		defer func() {
 			s.mu.Lock()
-			delete(s.active, task.SessionID)
+			s.active.Remove(task.SessionID)
 			s.mu.Unlock()
 		}()
 		started := time.Now()
@@ -212,43 +211,40 @@ func (s *Supervisor) Dispatch(ctx context.Context, req Request) (any, error) {
 		return s.Service.SessionResult(ctx, req.SessionID)
 	case actionSessionComplete:
 		s.mu.Lock()
-		if s.active[req.SessionID] {
+		if !s.active.Add(req.SessionID) {
 			s.mu.Unlock()
 			return nil, fault.New(fault.CodeSessionBusy, "session has active work")
 		}
-		s.active[req.SessionID] = true
 		s.mu.Unlock()
 		defer func() {
 			s.mu.Lock()
-			delete(s.active, req.SessionID)
+			s.active.Remove(req.SessionID)
 			s.mu.Unlock()
 		}()
 		return s.Service.CompleteSession(ctx, req.SessionID)
 	case actionSessionPublish:
 		s.mu.Lock()
-		if s.active[req.SessionID] {
+		if !s.active.Add(req.SessionID) {
 			s.mu.Unlock()
 			return nil, fault.New(fault.CodeSessionBusy, "session has active work")
 		}
-		s.active[req.SessionID] = true
 		s.mu.Unlock()
 		defer func() {
 			s.mu.Lock()
-			delete(s.active, req.SessionID)
+			s.active.Remove(req.SessionID)
 			s.mu.Unlock()
 		}()
 		return s.Service.PublishSession(ctx, req.SessionID)
 	case actionSessionCancel:
 		s.mu.Lock()
-		if s.active[req.SessionID] {
+		if !s.active.Add(req.SessionID) {
 			s.mu.Unlock()
 			return nil, fault.New(fault.CodeSessionBusy, "session has active work")
 		}
-		s.active[req.SessionID] = true
 		s.mu.Unlock()
 		defer func() {
 			s.mu.Lock()
-			delete(s.active, req.SessionID)
+			s.active.Remove(req.SessionID)
 			s.mu.Unlock()
 		}()
 		return s.Service.CancelSession(ctx, req.SessionID, req.Reason)
@@ -262,7 +258,7 @@ func (s *Supervisor) Dispatch(ctx context.Context, req Request) (any, error) {
 			return nil, err
 		}
 		s.mu.Lock()
-		active := s.active[result.Task.SessionID]
+		active := s.active.Has(result.Task.SessionID)
 		s.mu.Unlock()
 		result.Active = &active
 		return result, nil

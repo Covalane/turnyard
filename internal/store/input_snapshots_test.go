@@ -26,7 +26,7 @@ func TestReferencedInputBatchesReadsPersistedTasks(t *testing.T) {
 		t.Fatal(err)
 	}
 	refs, err := s.ReferencedInputBatches(ctx)
-	if err != nil || !refs["ses_test/"+batch] || len(refs) != 1 {
+	if err != nil || !refs.Has("ses_test/"+batch) || len(refs) != 1 {
 		t.Fatalf("persisted input references: %v %v", refs, err)
 	}
 }

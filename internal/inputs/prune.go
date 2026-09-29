@@ -6,11 +6,13 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+
+	"github.com/Covalane/turnyard/internal/collections"
 )
 
 // PruneOrphaned removes staged batches with no committed task. It runs under
 // the supervisor's exclusive state lock before new requests are accepted.
-func PruneOrphaned(ctx context.Context, stateRoot string, referenced map[string]bool) (int, error) {
+func PruneOrphaned(ctx context.Context, stateRoot string, referenced collections.Set[string]) (int, error) {
 	sessions, err := os.ReadDir(filepath.Join(stateRoot, "sessions"))
 	if os.IsNotExist(err) {
 		return 0, nil
@@ -35,7 +37,7 @@ func PruneOrphaned(ctx context.Context, stateRoot string, referenced map[string]
 			return removed, err
 		}
 		for _, batch := range batches {
-			if !batch.IsDir() || !isBatchDigest(batch.Name()) || referenced[session.Name()+"/"+batch.Name()] {
+			if !batch.IsDir() || !isBatchDigest(batch.Name()) || referenced.Has(session.Name()+"/"+batch.Name()) {
 				continue
 			}
 			if err := os.RemoveAll(filepath.Join(inputRoot, batch.Name())); err != nil {

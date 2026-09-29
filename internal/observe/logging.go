@@ -8,6 +8,7 @@ import (
 	"os/exec"
 	"syscall"
 
+	"github.com/Covalane/turnyard/internal/collections"
 	"github.com/Covalane/turnyard/internal/fault"
 )
 
@@ -53,25 +54,25 @@ type correlationHandler struct{ slog.Handler }
 
 func (h correlationHandler) Handle(ctx context.Context, record slog.Record) error {
 	ids := IDsFrom(ctx)
-	present := map[string]bool{}
-	record.Attrs(func(attr slog.Attr) bool { present[attr.Key] = true; return true })
+	present := collections.Set[string]{}
+	record.Attrs(func(attr slog.Attr) bool { present.Add(attr.Key); return true })
 	if ids.RequestID != "" {
-		if !present["request_id"] {
+		if !present.Has("request_id") {
 			record.AddAttrs(slog.String("request_id", ids.RequestID))
 		}
 	}
 	if ids.SessionID != "" {
-		if !present["session_id"] {
+		if !present.Has("session_id") {
 			record.AddAttrs(slog.String("session_id", ids.SessionID))
 		}
 	}
 	if ids.TaskID != "" {
-		if !present["task_id"] {
+		if !present.Has("task_id") {
 			record.AddAttrs(slog.String("task_id", ids.TaskID))
 		}
 	}
 	if ids.InvocationID != "" {
-		if !present["invocation_id"] {
+		if !present.Has("invocation_id") {
 			record.AddAttrs(slog.String("invocation_id", ids.InvocationID))
 		}
 	}

@@ -19,6 +19,7 @@ import (
 	"time"
 	"unicode"
 
+	"github.com/Covalane/turnyard/internal/collections"
 	"github.com/Covalane/turnyard/internal/contracts"
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 	"github.com/santhosh-tekuri/jsonschema/v6"
@@ -99,12 +100,12 @@ type Gateway struct {
 }
 
 func New(config Config, logger *slog.Logger) (*Gateway, error) {
-	ids := make(map[string]bool, len(config.Backends))
+	ids := collections.NewSet[string](len(config.Backends))
 	for _, backend := range config.Backends {
-		if backend.ID == "" || strings.Contains(backend.ID, "/") || ids[backend.ID] || len(backend.Argv) == 0 || backend.Argv[0] == "" || backend.TimeoutSeconds < 0 {
+		if backend.ID == "" || strings.Contains(backend.ID, "/") || ids.Has(backend.ID) || len(backend.Argv) == 0 || backend.Argv[0] == "" || backend.TimeoutSeconds < 0 {
 			return nil, fmt.Errorf("invalid tool gateway backend configuration")
 		}
-		ids[backend.ID] = true
+		ids.Add(backend.ID)
 	}
 	if logger == nil {
 		logger = slog.New(slog.NewTextHandler(os.Stderr, nil))

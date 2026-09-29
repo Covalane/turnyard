@@ -10,6 +10,7 @@ import (
 	"github.com/Covalane/turnyard/internal/agents"
 	"github.com/Covalane/turnyard/internal/agents/registry"
 	"github.com/Covalane/turnyard/internal/artifacts"
+	"github.com/Covalane/turnyard/internal/collections"
 	"github.com/Covalane/turnyard/internal/contracts"
 	"github.com/Covalane/turnyard/internal/fault"
 	"github.com/Covalane/turnyard/internal/gitstate"
@@ -26,9 +27,9 @@ type Service struct {
 	ArtifactVerifier  artifacts.PullRequestVerifier
 	activeDelegations atomic.Int64
 	delegationMu      sync.Mutex
-	activeChildTasks  map[string]bool
+	activeChildTasks  collections.Set[string]
 	runMu             sync.Mutex
-	runningSessions   map[string]bool
+	runningSessions   collections.Set[string]
 	additionMu        sync.Mutex
 	additionLocks     map[string]*additionLock
 }
@@ -83,18 +84,14 @@ func (s *Service) ActiveDelegations() int64 { return s.activeDelegations.Load() 
 // verification from using the same workspace and task state concurrently.
 func (s *Service) reserveSession(sessionID string) (func(), error) {
 	s.runMu.Lock()
-	if s.runningSessions == nil {
-		s.runningSessions = map[string]bool{}
-	}
-	if s.runningSessions[sessionID] {
+	if !s.runningSessions.Add(sessionID) {
 		s.runMu.Unlock()
 		return nil, fault.New(fault.CodeConcurrentRun, "session already has active work")
 	}
-	s.runningSessions[sessionID] = true
 	s.runMu.Unlock()
 	return func() {
 		s.runMu.Lock()
-		delete(s.runningSessions, sessionID)
+		s.runningSessions.Remove(sessionID)
 		s.runMu.Unlock()
 	}, nil
 }

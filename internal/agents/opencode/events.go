@@ -9,6 +9,7 @@ import (
 	"strings"
 
 	"github.com/Covalane/turnyard/internal/agents"
+	"github.com/Covalane/turnyard/internal/collections"
 	"github.com/Covalane/turnyard/internal/fault"
 )
 
@@ -29,9 +30,9 @@ type openCodeEvent struct {
 
 func parseOpenCodeEvents(output string) (agents.AgentResult, error) {
 	result := agents.AgentResult{}
-	ids := map[string]bool{}
-	called := map[string]bool{}
-	loaded := map[string]bool{}
+	ids := collections.Set[string]{}
+	called := collections.Set[string]{}
+	loaded := collections.Set[string]{}
 	for _, line := range strings.Split(output, "\n") {
 		var event openCodeEvent
 		if json.Unmarshal([]byte(line), &event) != nil || event.Type == "" {
@@ -39,14 +40,14 @@ func parseOpenCodeEvents(output string) (agents.AgentResult, error) {
 		}
 		result.Events = append(result.Events, json.RawMessage(line))
 		if event.SessionID != "" {
-			ids[event.SessionID] = true
+			ids.Add(event.SessionID)
 		}
 		if event.Type != "tool_use" || event.Part.State.Status != "completed" || event.Part.Tool == "" {
 			continue
 		}
-		called[event.Part.Tool] = true
+		called.Add(event.Part.Tool)
 		if event.Part.Tool == "skill" && event.Part.State.Input.Name != "" {
-			loaded[event.Part.State.Input.Name] = true
+			loaded.Add(event.Part.State.Input.Name)
 		}
 	}
 	if len(ids) > 1 {
