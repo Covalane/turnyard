@@ -24,16 +24,23 @@ const maxInputBytes = 256 << 20
 
 // Stage replaces source URLs and local paths with content-pinned, session-local
 // paths. The original signed URL is not stored in the task specification.
-func BatchPath(sessionRoot string, work contracts.WorkSpec) string {
-	return filepath.Join(sessionRoot, "inputs", contracts.Digest(work))
+func BatchPath(sessionRoot string, work contracts.WorkSpec) (string, error) {
+	batch, err := contracts.Digest(work)
+	if err != nil {
+		return "", err
+	}
+	return filepath.Join(sessionRoot, "inputs", batch), nil
 }
 
 func Stage(ctx context.Context, work contracts.WorkSpec, workPath, sessionRoot string, env contracts.EnvironmentSpec) (staged contracts.WorkSpec, stageErr error) {
 	if len(work.Inputs) == 0 {
 		return work, nil
 	}
-	batch := contracts.Digest(work)
-	root := BatchPath(sessionRoot, work)
+	batch, err := contracts.Digest(work)
+	if err != nil {
+		return work, err
+	}
+	root := filepath.Join(sessionRoot, "inputs", batch)
 	if err := os.MkdirAll(root, 0o700); err != nil {
 		return work, err
 	}

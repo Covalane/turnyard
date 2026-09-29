@@ -70,7 +70,10 @@ func kimiConfig(binding contracts.ModelBinding, agent contracts.AgentSpec, env c
 		mcp[launch.ID] = map[string]any{"command": launch.Argv[0], "args": launch.Argv[1:]}
 	}
 	if len(mcp) > 0 {
-		content := contracts.JSONText(map[string]any{"mcpServers": mcp})
+		content, err := contracts.JSONText(map[string]any{"mcpServers": mcp})
+		if err != nil {
+			return err
+		}
 		mcpPath := filepath.Join(root, "mcp.json")
 		if err := agents.WritePinnedConfiguration(state, mcpPath, []byte(content), "Kimi MCP configuration"); err != nil {
 			return err

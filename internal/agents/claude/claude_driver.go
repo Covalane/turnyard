@@ -57,7 +57,10 @@ func (Driver) Invoke(ctx context.Context, input agents.AgentInvocation) (agents.
 	}
 	if len(mcp) > 0 {
 		path := filepath.Join(input.State, "claude", "mcp.json")
-		content := contracts.JSONText(map[string]any{"mcpServers": mcp})
+		content, err := contracts.JSONText(map[string]any{"mcpServers": mcp})
+		if err != nil {
+			return result, err
+		}
 		if err := agents.WritePinnedConfiguration(input.State, path, []byte(content), "Claude MCP configuration"); err != nil {
 			return result, err
 		}

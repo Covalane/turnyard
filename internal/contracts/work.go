@@ -28,7 +28,11 @@ func ValidateWork(path string, session SessionSpec, env EnvironmentSpec) (WorkSp
 // It applies the same JSON schema and semantic checks as the file input path.
 func ValidateWorkSpec(work WorkSpec, session SessionSpec, env EnvironmentSpec) (WorkSpec, error) {
 	var value any
-	if err := json.Unmarshal([]byte(JSONText(work)), &value); err != nil {
+	encoded, err := JSONText(work)
+	if err != nil {
+		return work, err
+	}
+	if err := json.Unmarshal([]byte(encoded), &value); err != nil {
 		return work, err
 	}
 	schema, err := schemaFor("work")

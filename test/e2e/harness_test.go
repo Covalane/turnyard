@@ -81,7 +81,11 @@ func newHarness(t *testing.T, prefix string) *harness {
 	if err != nil {
 		t.Fatal(err)
 	}
-	root := filepath.Join(repoRoot, ".turnyard", prefix+"-"+time.Now().Format("20060102-150405")+"-"+strings.TrimPrefix(contracts.NewID(""), "_"))
+	nonce, err := contracts.NewID("")
+	if err != nil {
+		t.Fatal(err)
+	}
+	root := filepath.Join(repoRoot, ".turnyard", prefix+"-"+time.Now().Format("20060102-150405")+"-"+strings.TrimPrefix(nonce, "_"))
 	if err := os.MkdirAll(root, 0700); err != nil {
 		t.Fatal(err)
 	}

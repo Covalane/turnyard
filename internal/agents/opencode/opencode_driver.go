@@ -35,7 +35,10 @@ func prepareOpenCode(env contracts.EnvironmentSpec, agent contracts.AgentSpec, b
 			"edit":               map[string]string{"/turnyard-control/delegations/**": "deny"},
 		}
 	}
-	previous := contracts.JSONText(config)
+	previous, err := contracts.JSONText(config)
+	if err != nil {
+		return "", err
+	}
 	configDir := filepath.Join(state, "config", "opencode")
 	if err := agents.EnsureStateDirectory(state, configDir); err != nil {
 		return "", err
@@ -51,7 +54,10 @@ func prepareOpenCode(env contracts.EnvironmentSpec, agent contracts.AgentSpec, b
 		}
 		config["mcp"] = mcp
 	}
-	expected := contracts.JSONText(config)
+	expected, err := contracts.JSONText(config)
+	if err != nil {
+		return "", err
+	}
 	configPath := filepath.Join(configDir, "opencode.json")
 	if len(agent.Tools) == 0 && len(agent.Delegates) == 0 {
 		if err := agents.WritePinnedAdditiveConfiguration(state, configPath, []byte(expected), []byte(previous), "OpenCode configuration"); err != nil {

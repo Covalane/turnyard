@@ -51,7 +51,10 @@ func TestPartialStageRemovesLinkedSnapshot(t *testing.T) {
 		{ID: "first", Source: contracts.InputSource{Kind: contracts.InputFile, Path: first}},
 		{ID: "missing", Source: contracts.InputSource{Kind: contracts.InputFile, Path: filepath.Join(root, "missing.txt")}},
 	}}
-	batch := BatchPath(root, work)
+	batch, err := BatchPath(root, work)
+	if err != nil {
+		t.Fatal(err)
+	}
 	if _, err := Stage(context.Background(), work, "", root, contracts.EnvironmentSpec{}); err == nil {
 		t.Fatal("missing second input did not fail staging")
 	}

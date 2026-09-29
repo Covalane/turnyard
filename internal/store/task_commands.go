@@ -48,7 +48,10 @@ func (s *Store) AddTask(ctx context.Context, in AddTaskInput) (AddTaskResult, er
 		if err != nil {
 			return err
 		}
-		id := contracts.NewID("work")
+		id, err := contracts.NewID("work")
+		if err != nil {
+			return err
+		}
 		if err := tx.Task.Create().SetID(id).SetSessionID(in.SessionID).SetSequence(count + 1).
 			SetIdempotencyKey(in.Key).SetSpec(in.SpecJSON).SetSpecDigest(in.Digest).
 			SetStatus(lifecycle.Queued).SetCreatedAt(now()).Exec(ctx); err != nil {

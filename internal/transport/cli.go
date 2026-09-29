@@ -319,16 +319,20 @@ func runCLI(ctx context.Context, args []string) (map[string]any, error) {
 				return ClientRequest(ctx, home, Request{Action: actionTaskShow, TaskID: id}, true)
 			}
 			for {
-				result, err := ClientRequest(ctx, home, Request{Action: actionTaskShow, TaskID: id}, true)
+				response, err := clientRequestResponse(ctx, home, Request{Action: actionTaskShow, TaskID: id}, true)
 				if err != nil {
 					return nil, err
 				}
-				done, err := taskWaitDone(result)
+				state, err := decodeClientResult[taskWaitResult](response)
+				if err != nil {
+					return nil, err
+				}
+				done, err := taskWaitDone(state)
 				if err != nil {
 					return nil, err
 				}
 				if done {
-					return result, nil
+					return decodeClientResult[map[string]any](response)
 				}
 				select {
 				case <-ctx.Done():
@@ -345,16 +349,20 @@ func runCLI(ctx context.Context, args []string) (map[string]any, error) {
 	return nil, fault.New(fault.CodeInvalidRequest, "unknown command")
 }
 
-// taskWaitDone is the only place the dynamic CLI response is interpreted as a
-// task state. A malformed response must fail instead of polling forever.
-func taskWaitDone(result map[string]any) (bool, error) {
-	task, taskOK := result["task"].(map[string]any)
-	active, activeOK := result["active"].(bool)
-	status, statusOK := task["status"].(string)
-	if !taskOK || !activeOK || !statusOK || status == "" {
+type taskWaitResult struct {
+	Task *struct {
+		Status string `json:"status"`
+	} `json:"task"`
+	Active *bool `json:"active"`
+}
+
+// A missing task or active flag is a malformed supervisor response, not an
+// unfinished task that should be polled indefinitely.
+func taskWaitDone(result taskWaitResult) (bool, error) {
+	if result.Task == nil || result.Active == nil || result.Task.Status == "" {
 		return false, fault.New(fault.CodeDaemonUnavailable, "invalid task status response")
 	}
-	return !active && lifecycle.WaitStops(status), nil
+	return !*result.Active && lifecycle.WaitStops(result.Task.Status), nil
 }
 
 func CLI(ctx context.Context, args []string, stdout, stderr io.Writer) int {

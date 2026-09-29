@@ -44,7 +44,15 @@ func (s *Service) runChecks(ctx context.Context, tid, sid, candidateID string, w
 		if timeout == 0 {
 			timeout = 120
 		}
-		name := "check-" + tid + "-" + contracts.NewID("run")
+		runID, err := contracts.NewID("run")
+		if err != nil {
+			return out, err
+		}
+		name := "check-" + tid + "-" + runID
+		specDigest, err := contracts.Digest(def)
+		if err != nil {
+			return out, err
+		}
 		logPath := filepath.Join(filepath.Dir(workspace), "logs", name+".txt")
 		result, err := backend.Run(ctx, sandbox.SandboxRun{Name: "ty-" + name, Sandbox: env.Sandbox, Workspace: workspace, Scope: readonly,
 			State: filepath.Join(filepath.Dir(workspace), "check-state"), ArtifactDir: filepath.Join(filepath.Dir(workspace), "outputs", candidateID), ArtifactReadOnly: true,
@@ -53,7 +61,7 @@ func (s *Service) runChecks(ctx context.Context, tid, sid, candidateID string, w
 			return out, err
 		}
 		record := CheckResult{
-			ID: id, SpecDigest: contracts.Digest(def), Repositories: def.Repositories,
+			ID: id, SpecDigest: specDigest, Repositories: def.Repositories,
 			ExitCode: result.ExitCode, TimedOut: result.TimedOut,
 			Passed: result.ExitCode == 0 && !result.TimedOut, LogPath: logPath,
 		}
@@ -142,8 +150,11 @@ func (s *Service) VerifyCandidate(ctx context.Context, tid string) (CandidateVer
 	if err := json.Unmarshal([]byte(candidate.Deliverables), &prior); err != nil {
 		return CandidateVerificationResult{}, fault.Wrap(fault.CodeCandidateCorrupt, "decode deliverables", err, "candidate deliverables are invalid")
 	}
-	legacy := legacyCandidateDigest(vector, candidate.Digest)
-	if !legacy && candidateDigest(vector, work, prior) != candidate.Digest {
+	matches, legacy, err := candidateMatchesStoredDigest(vector, work, prior, candidate.Digest)
+	if err != nil {
+		return CandidateVerificationResult{}, err
+	}
+	if !matches {
 		return CandidateVerificationResult{}, fault.New(fault.CodeCandidateCorrupt, "candidate digest mismatch")
 	}
 	localPaths := artifacts.SealedPaths(filepath.Dir(row.Workspace), candidate.ID, work.Deliverables)
@@ -151,8 +162,14 @@ func (s *Service) VerifyCandidate(ctx context.Context, tid string) (CandidateVer
 	if err != nil {
 		return CandidateVerificationResult{}, err
 	}
-	if !legacy && candidateDigest(vector, work, deliverables) != candidate.Digest {
-		return CandidateVerificationResult{}, fault.New(fault.CodeCandidateStale, "sealed outputs differ from candidate")
+	if !legacy {
+		sealedMatches, _, err := candidateMatchesStoredDigest(vector, work, deliverables, candidate.Digest)
+		if err != nil {
+			return CandidateVerificationResult{}, err
+		}
+		if !sealedMatches {
+			return CandidateVerificationResult{}, fault.New(fault.CodeCandidateStale, "sealed outputs differ from candidate")
+		}
 	}
 	sandbox, err := s.BackendFactory(env.Sandbox.Backend)
 	if err != nil {

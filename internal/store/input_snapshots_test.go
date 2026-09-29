@@ -22,7 +22,11 @@ func TestReferencedInputBatchesReadsPersistedTasks(t *testing.T) {
 	work := contracts.WorkSpec{Inputs: []contracts.InputSpec{{ID: "image", Source: contracts.InputSource{
 		Kind: contracts.InputStaged, Path: batch + "/image",
 	}}}}
-	if _, err := s.AddTask(ctx, AddTaskInput{SessionID: "ses_test", Key: "work", SpecJSON: contracts.JSONText(work), Digest: "digest"}); err != nil {
+	workJSON, err := contracts.JSONText(work)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := s.AddTask(ctx, AddTaskInput{SessionID: "ses_test", Key: "work", SpecJSON: workJSON, Digest: "digest"}); err != nil {
 		t.Fatal(err)
 	}
 	refs, err := s.ReferencedInputBatches(ctx)

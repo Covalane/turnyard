@@ -171,7 +171,10 @@ func (s *Service) finalizeTurn(ctx context.Context, input turnExecution, bases, 
 	if err != nil {
 		return TaskRunResult{}, err
 	}
-	candidateID := contracts.NewID("cand")
+	candidateID, err := contracts.NewID("cand")
+	if err != nil {
+		return TaskRunResult{}, err
+	}
 	localPaths, err := artifacts.SealOutputs(ctx, artifactOutputDir(input), input.workspace, filepath.Dir(input.workspace), candidateID, vector, input.work.Deliverables)
 	if err != nil {
 		return TaskRunResult{}, err
@@ -180,7 +183,10 @@ func (s *Service) finalizeTurn(ctx context.Context, input turnExecution, bases, 
 	if err != nil {
 		return TaskRunResult{}, err
 	}
-	digest := candidateDigest(vector, input.work, deliverables)
+	digest, err := candidateDigest(vector, input.work, deliverables)
+	if err != nil {
+		return TaskRunResult{}, err
+	}
 	if err := s.Store.RecordCandidate(ctx, input.task.SessionID, input.task.ID, candidateID, digest, vector, deliverables); err != nil {
 		return TaskRunResult{}, err
 	}
@@ -219,7 +225,7 @@ func (s *Service) finalizeTurn(ctx context.Context, input turnExecution, bases, 
 		NativeSessionID: agentResult.NativeID}, nil
 }
 
-func candidateDigest(vector map[string]gitstate.RepoVersion, work contracts.WorkSpec, results []artifacts.Result) string {
+func candidateDigest(vector map[string]gitstate.RepoVersion, work contracts.WorkSpec, results []artifacts.Result) (string, error) {
 	type fingerprint struct{ ID, Kind, SHA256, Text, URL string }
 	outputs := make([]fingerprint, 0, len(results))
 	for _, result := range results {
@@ -232,8 +238,21 @@ func candidateDigest(vector map[string]gitstate.RepoVersion, work contracts.Work
 	}{vector, work, outputs})
 }
 
-func legacyCandidateDigest(vector map[string]gitstate.RepoVersion, digest string) bool {
-	return len(vector) > 0 && contracts.Digest(vector) == digest
+// candidateMatchesStoredDigest accepts the historical vector-only digest while
+// recording which form matched, so later output reinspection can use the same
+// compatibility rule without duplicating hash logic.
+func candidateMatchesStoredDigest(vector map[string]gitstate.RepoVersion, work contracts.WorkSpec, results []artifacts.Result, digest string) (matches, legacy bool, err error) {
+	if len(vector) > 0 {
+		prior, err := contracts.Digest(vector)
+		if err != nil {
+			return false, false, err
+		}
+		if prior == digest {
+			return true, true, nil
+		}
+	}
+	actual, err := candidateDigest(vector, work, results)
+	return actual == digest, false, err
 }
 
 func checksPassed(checks []CheckResult) bool {
@@ -250,8 +269,12 @@ func (s *Service) deliverOutputs(ctx context.Context, sid, tid string, env contr
 		if spec.Destination == nil || spec.Destination.Kind != contracts.DestinationConnector || results[i].Status != artifacts.StatusPresent {
 			continue
 		}
+		uriDigest, err := contracts.Digest(spec.Destination.URI)
+		if err != nil {
+			return nil, err
+		}
 		intent := map[string]any{"deliverable_id": spec.ID, "connector": spec.Destination.Connector,
-			"uri_digest": contracts.Digest(spec.Destination.URI), "sha256": results[i].SHA256}
+			"uri_digest": uriDigest, "sha256": results[i].SHA256}
 		if err := s.Store.AppendEvent(ctx, sid, tid, lifecycle.EventArtifactDeliveryIntent, intent); err != nil {
 			return nil, err
 		}

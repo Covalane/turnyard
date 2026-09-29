@@ -101,7 +101,10 @@ func (d *delegationServer) submit(ctx context.Context, key string, req delegatio
 	requestShape := req
 	requestShape.Action, requestShape.Reply = "", ""
 	requestShape.Retry, requestShape.TimeoutSeconds = false, 0
-	requestDigest := contracts.Digest(requestShape)
+	requestDigest, err := contracts.Digest(requestShape)
+	if err != nil {
+		return nil, err
+	}
 	if !contains(d.parent.agent.Delegates, req.AgentID) {
 		return nil, fault.New(fault.CodeCapabilityMissing, "agent %s cannot delegate to %s", d.parent.agent.ID, req.AgentID)
 	}

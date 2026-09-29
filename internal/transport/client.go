@@ -24,9 +24,41 @@ func DefaultHome() string {
 	}
 	return filepath.Join(home, ".local", "share", "turnyard")
 }
-func ClientRequest(ctx context.Context, home string, req Request, start bool) (result map[string]any, requestErr error) {
+
+type clientResponse struct {
+	OK        bool            `json:"ok"`
+	Result    json.RawMessage `json:"result"`
+	Error     *fault.Error    `json:"error"`
+	RequestID string          `json:"request_id"`
+}
+
+func ClientRequest(ctx context.Context, home string, req Request, start bool) (map[string]any, error) {
+	response, err := clientRequestResponse(ctx, home, req, start)
+	if err != nil {
+		return nil, err
+	}
+	return decodeClientResult[map[string]any](response)
+}
+
+func decodeClientResult[T any](response *clientResponse) (T, error) {
+	var result T
+	if err := json.Unmarshal(response.Result, &result); err != nil {
+		wrapped := fault.Wrap(fault.CodeDaemonUnavailable, "decode supervisor result", err, "supervisor result is invalid")
+		if typed, ok := wrapped.(*fault.Error); ok {
+			typed.RequestID = response.RequestID
+		}
+		return result, wrapped
+	}
+	return result, nil
+}
+
+func clientRequestResponse(ctx context.Context, home string, req Request, start bool) (wire *clientResponse, requestErr error) {
 	if req.RequestID == "" {
-		req.RequestID = contracts.NewID("req")
+		id, err := contracts.NewID("req")
+		if err != nil {
+			return nil, err
+		}
+		req.RequestID = id
 	}
 	defer func() {
 		if requestErr == nil {
@@ -86,12 +118,7 @@ func ClientRequest(ctx context.Context, home string, req Request, start bool) (r
 	if err != nil {
 		return nil, fault.Wrap(fault.CodeDaemonUnavailable, "read supervisor", err, "supervisor response unavailable")
 	}
-	var response struct {
-		OK        bool           `json:"ok"`
-		Result    map[string]any `json:"result"`
-		Error     *fault.Error   `json:"error"`
-		RequestID string         `json:"request_id"`
-	}
+	var response clientResponse
 	if err := json.Unmarshal(line, &response); err != nil {
 		return nil, fault.Wrap(fault.CodeDaemonUnavailable, "decode supervisor response", err, "supervisor response is invalid")
 	}
@@ -102,7 +129,7 @@ func ClientRequest(ctx context.Context, home string, req Request, start bool) (r
 		response.Error.RequestID = response.RequestID
 		return nil, response.Error
 	}
-	return response.Result, nil
+	return &response, nil
 }
 func StartDaemon(ctx context.Context, home string) error {
 	if err := os.MkdirAll(home, 0o700); err != nil {

@@ -43,7 +43,11 @@ func TestOpenCodeNoToolSessionGainsInputCapability(t *testing.T) {
 		t.Fatal(err)
 	}
 	delete(previous, "mcp")
-	if err := os.WriteFile(path, []byte(contracts.JSONText(previous)), 0o600); err != nil {
+	previousJSON, err := contracts.JSONText(previous)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(path, []byte(previousJSON), 0o600); err != nil {
 		t.Fatal(err)
 	}
 	if _, err := prepareOpenCode(contracts.EnvironmentSpec{}, agent, binding, state); err != nil {

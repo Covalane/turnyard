@@ -29,10 +29,13 @@ func (s *Service) CreateSession(ctx context.Context, path string) (SessionCreati
 // createSession also serves child sessions. A child uses the same validation,
 // image pinning, clone and persistence path as a top-level session.
 func (s *Service) createSession(ctx context.Context, session contracts.SessionSpec, env contracts.EnvironmentSpec, parent store.CreateSessionInput) (SessionCreationResult, error) {
-	creationDigest := contracts.Digest(struct {
+	creationDigest, err := contracts.Digest(struct {
 		Session     contracts.SessionSpec
 		Environment contracts.EnvironmentSpec
 	}{session, env})
+	if err != nil {
+		return SessionCreationResult{}, err
+	}
 	prior, found, err := s.Store.SessionByCreationKey(ctx, session.IdempotencyKey)
 	if err != nil {
 		return SessionCreationResult{}, err
@@ -96,7 +99,22 @@ func (s *Service) createSession(ctx context.Context, session contracts.SessionSp
 	if err != nil {
 		return SessionCreationResult{}, err
 	}
-	sid := contracts.NewID("ses")
+	sessionJSON, err := contracts.JSONText(session)
+	if err != nil {
+		return SessionCreationResult{}, err
+	}
+	environmentJSON, err := contracts.JSONText(env)
+	if err != nil {
+		return SessionCreationResult{}, err
+	}
+	environmentDigest, err := contracts.Digest(env)
+	if err != nil {
+		return SessionCreationResult{}, err
+	}
+	sid, err := contracts.NewID("ses")
+	if err != nil {
+		return SessionCreationResult{}, err
+	}
 	ctx = observe.WithIDs(ctx, observe.IDs{SessionID: sid})
 	root := filepath.Join(s.Store.Root, "sessions", sid)
 	workspace := filepath.Join(root, "workspace")
@@ -110,7 +128,7 @@ func (s *Service) createSession(ctx context.Context, session contracts.SessionSp
 	if err != nil {
 		return SessionCreationResult{}, cleanupUnregisteredSession(ctx, root, err)
 	}
-	created, err := s.Store.CreateSession(ctx, store.CreateSessionInput{ID: sid, SpecJSON: contracts.JSONText(session), EnvironmentJSON: contracts.JSONText(env), EnvironmentDigest: contracts.Digest(env), Workspace: workspace, Repositories: status, ImageDigest: env.Sandbox.ImageDigest, IdempotencyKey: session.IdempotencyKey, CreationDigest: creationDigest,
+	created, err := s.Store.CreateSession(ctx, store.CreateSessionInput{ID: sid, SpecJSON: sessionJSON, EnvironmentJSON: environmentJSON, EnvironmentDigest: environmentDigest, Workspace: workspace, Repositories: status, ImageDigest: env.Sandbox.ImageDigest, IdempotencyKey: session.IdempotencyKey, CreationDigest: creationDigest,
 		ParentSessionID: parent.ParentSessionID, ParentTaskID: parent.ParentTaskID, ParentInvocationID: parent.ParentInvocationID, DelegateAgentID: parent.DelegateAgentID,
 		DelegationRequestDigest: parent.DelegationRequestDigest})
 	if err != nil {
@@ -189,7 +207,10 @@ func (s *Service) addTask(ctx context.Context, sid string, work contracts.WorkSp
 	if err != nil {
 		return TaskAdditionResult{}, err
 	}
-	requestDigest := contracts.Digest(work)
+	requestDigest, err := contracts.Digest(work)
+	if err != nil {
+		return TaskAdditionResult{}, err
+	}
 	if existing, found, err := s.Store.TaskByKey(ctx, sid, work.IdempotencyKey); err != nil {
 		return TaskAdditionResult{}, err
 	} else if found {
@@ -197,28 +218,49 @@ func (s *Service) addTask(ctx context.Context, sid string, work contracts.WorkSp
 		if err := json.Unmarshal([]byte(existing.Spec), &saved); err != nil {
 			return TaskAdditionResult{}, err
 		}
-		matches := saved.RequestDigest == requestDigest || saved.RequestDigest == "" && contracts.Digest(saved) == requestDigest
+		matches := saved.RequestDigest == requestDigest
+		if !matches && saved.RequestDigest == "" {
+			legacyDigest, err := contracts.Digest(saved)
+			if err != nil {
+				return TaskAdditionResult{}, err
+			}
+			matches = legacyDigest == requestDigest
+		}
 		if !matches {
 			return TaskAdditionResult{}, fault.New(fault.CodeIdempotencyConflict, "key already used with different task")
 		}
 		return TaskAdditionResult{TaskID: existing.ID, Status: existing.Status, Replayed: true}, nil
 	}
 	work.RequestDigest = requestDigest
-	stageRoot := inputs.BatchPath(filepath.Dir(row.Workspace), work)
+	stageRoot, err := inputs.BatchPath(filepath.Dir(row.Workspace), work)
+	if err != nil {
+		return TaskAdditionResult{}, err
+	}
 	work, err = inputs.Stage(ctx, work, sourcePath, filepath.Dir(row.Workspace), env)
 	if err != nil {
 		return TaskAdditionResult{}, err
 	}
-	fingerprint := contracts.Digest(work)
-	created, err := s.Store.AddTask(ctx, store.AddTaskInput{SessionID: sid, Key: work.IdempotencyKey, SpecJSON: contracts.JSONText(work), Digest: fingerprint})
+	fingerprint, err := contracts.Digest(work)
 	if err != nil {
-		if cleanupErr := os.RemoveAll(stageRoot); cleanupErr != nil {
-			return TaskAdditionResult{}, fault.Wrap(fault.CodeInternalError, "remove rejected task inputs", errors.Join(err, cleanupErr), "task input cleanup failed")
-		}
-		return TaskAdditionResult{}, err
+		return TaskAdditionResult{}, cleanupRejectedTaskInputs(stageRoot, err)
+	}
+	workJSON, err := contracts.JSONText(work)
+	if err != nil {
+		return TaskAdditionResult{}, cleanupRejectedTaskInputs(stageRoot, err)
+	}
+	created, err := s.Store.AddTask(ctx, store.AddTaskInput{SessionID: sid, Key: work.IdempotencyKey, SpecJSON: workJSON, Digest: fingerprint})
+	if err != nil {
+		return TaskAdditionResult{}, cleanupRejectedTaskInputs(stageRoot, err)
 	}
 	observe.Log.InfoContext(ctx, "task added", "session_id", sid, "task_id", created.ID, "replayed", created.Replayed)
 	return TaskAdditionResult{TaskID: created.ID, Status: created.Status, Replayed: created.Replayed}, nil
+}
+
+func cleanupRejectedTaskInputs(stageRoot string, cause error) error {
+	if cleanupErr := os.RemoveAll(stageRoot); cleanupErr != nil {
+		return fault.Wrap(fault.CodeInternalError, "remove rejected task inputs", errors.Join(cause, cleanupErr), "task input cleanup failed")
+	}
+	return cause
 }
 
 // CompleteSession ends execution after verified tasks have been reviewed.

@@ -272,8 +272,15 @@ func TestRejectedTaskAdditionRemovesStagedInputs(t *testing.T) {
 	work.Scope.Repositories = []ScopeRepo{{ID: "api", Mode: "read"}, {ID: "web", Mode: "read"}}
 	path := filepath.Join(f.root, "inputs", "rejected.json")
 	writeJSON(t, path, work)
-	work.RequestDigest = contracts.Digest(work)
-	root := inputs.BatchPath(filepath.Join(f.service.Store.Root, "sessions", f.sid), work)
+	requestDigest, err := contracts.Digest(work)
+	if err != nil {
+		t.Fatal(err)
+	}
+	work.RequestDigest = requestDigest
+	root, err := inputs.BatchPath(filepath.Join(f.service.Store.Root, "sessions", f.sid), work)
+	if err != nil {
+		t.Fatal(err)
+	}
 	if _, err := f.service.AddTask(context.Background(), f.sid, path); fault.CodeOf(err) != fault.CodeSessionBusy {
 		t.Fatalf("task was not rejected as busy: %v", err)
 	}

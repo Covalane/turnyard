@@ -115,7 +115,14 @@ func (s *Service) RunTask(ctx context.Context, tid, reply string, retry bool, ti
 			}
 		}
 	}
-	turnID, invocationID := contracts.NewID("turn"), contracts.NewID("inv")
+	turnID, err := contracts.NewID("turn")
+	if err != nil {
+		return TaskRunResult{}, err
+	}
+	invocationID, err := contracts.NewID("inv")
+	if err != nil {
+		return TaskRunResult{}, err
+	}
 	ctx = observe.WithIDs(ctx, observe.IDs{InvocationID: invocationID})
 	agent, binding, err := agents.SelectAgent(env, session.PrimaryAgent)
 	if err != nil {

@@ -44,5 +44,5 @@ func digestBundle(root string, skipMarker bool) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	return Digest(files), nil
+	return Digest(files)
 }

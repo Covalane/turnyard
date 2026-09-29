@@ -74,7 +74,11 @@ func (s *Service) PublishSession(ctx context.Context, sid string) (SessionPublic
 		if err := json.Unmarshal([]byte(candidate.Deliverables), &prior); err != nil {
 			return SessionPublicationResult{}, fault.Wrap(fault.CodeCandidateCorrupt, "decode deliverables", err, "task %s candidate is invalid", task.ID)
 		}
-		if !legacyCandidateDigest(vector, candidate.Digest) && candidateDigest(vector, work, prior) != candidate.Digest {
+		matches, _, err := candidateMatchesStoredDigest(vector, work, prior, candidate.Digest)
+		if err != nil {
+			return SessionPublicationResult{}, err
+		}
+		if !matches {
 			return SessionPublicationResult{}, fault.New(fault.CodeCandidateCorrupt, "task %s candidate digest is invalid", task.ID)
 		}
 		for _, scope := range work.Scope.Repositories {

@@ -308,33 +308,7 @@ func (s *Supervisor) handle(parent context.Context, conn net.Conn) {
 	if readErr == errFrameTooLarge || json.Unmarshal(line, &req) != nil {
 		response.Error = &fault.Error{Code: fault.CodeInvalidRequest, Message: "invalid request JSON"}
 	} else {
-		if req.RequestID == "" {
-			req.RequestID = contracts.NewID("req")
-		}
-		response.RequestID = req.RequestID
-		base := observe.WithIDs(parent, observe.IDs{RequestID: req.RequestID, SessionID: req.SessionID, TaskID: req.TaskID})
-		logCtx = base
-		workLimit, limitErr := workTimeout(req)
-		if limitErr != nil {
-			response.Error = &fault.Error{Code: fault.CodeInvalidRequest, Message: limitErr.Error()}
-		} else {
-			if err := conn.SetDeadline(time.Now().Add(workLimit + wireResponseMargin)); err != nil {
-				observe.LogFailure(base, "supervisor work deadline failed", fault.Wrap(fault.CodeDaemonUnavailable, "set supervisor work deadline", err, "connection deadline unavailable"))
-				response.Error = &fault.Error{Code: fault.CodeDaemonUnavailable, Message: "connection deadline unavailable"}
-			} else {
-				ctx, cancel := context.WithTimeout(base, workLimit)
-				defer cancel()
-				value, err := s.Dispatch(ctx, req)
-				if err != nil {
-					observed := fault.Ensure(err, "dispatch supervisor request")
-					observe.LogFailure(ctx, "supervisor request failed", observed, "action", req.Action)
-					response.Error = &fault.Error{Code: fault.CodeOf(observed), Message: err.Error()}
-				} else {
-					response.OK = true
-					response.Result = value
-				}
-			}
-		}
+		response, logCtx = s.respondToRequest(parent, conn, req)
 	}
 	data, err := json.Marshal(response)
 	if err != nil || len(data)+1 > maxResponseBytes {
@@ -352,6 +326,42 @@ func (s *Supervisor) handle(parent context.Context, conn net.Conn) {
 		observe.LogFailure(logCtx, "supervisor response delivery failed", fault.Wrap(fault.CodeDaemonUnavailable, "send supervisor response", err, "response could not be delivered"))
 	}
 }
+
+func (s *Supervisor) respondToRequest(parent context.Context, conn net.Conn, req Request) (Response, context.Context) {
+	if req.RequestID == "" {
+		id, err := contracts.NewID("req")
+		if err != nil {
+			observe.LogFailure(parent, "supervisor request ID generation failed", err)
+			return Response{Error: &fault.Error{Code: fault.CodeInternalError, Message: "request ID unavailable"}}, parent
+		}
+		req.RequestID = id
+	}
+	base := observe.WithIDs(parent, observe.IDs{RequestID: req.RequestID, SessionID: req.SessionID, TaskID: req.TaskID})
+	response := Response{RequestID: req.RequestID}
+	workLimit, err := workTimeout(req)
+	if err != nil {
+		response.Error = &fault.Error{Code: fault.CodeInvalidRequest, Message: err.Error()}
+		return response, base
+	}
+	if err := conn.SetDeadline(time.Now().Add(workLimit + wireResponseMargin)); err != nil {
+		observe.LogFailure(base, "supervisor work deadline failed", fault.Wrap(fault.CodeDaemonUnavailable, "set supervisor work deadline", err, "connection deadline unavailable"))
+		response.Error = &fault.Error{Code: fault.CodeDaemonUnavailable, Message: "connection deadline unavailable"}
+		return response, base
+	}
+	ctx, cancel := context.WithTimeout(base, workLimit)
+	defer cancel()
+	value, err := s.Dispatch(ctx, req)
+	if err != nil {
+		observed := fault.Ensure(err, "dispatch supervisor request")
+		observe.LogFailure(ctx, "supervisor request failed", observed, "action", req.Action)
+		response.Error = &fault.Error{Code: fault.CodeOf(observed), Message: err.Error()}
+		return response, base
+	}
+	response.OK = true
+	response.Result = value
+	return response, base
+}
+
 func Serve(ctx context.Context, home string) error {
 	if err := os.MkdirAll(home, 0o700); err != nil {
 		return err

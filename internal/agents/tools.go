@@ -77,12 +77,15 @@ func PrepareTools(agent contracts.AgentSpec, env contracts.EnvironmentSpec, stat
 			if err := EnsureStateDirectory(state, filepath.Dir(configPath)); err != nil {
 				return nil, err
 			}
-			config := contracts.JSONText(struct {
+			config, err := contracts.JSONText(struct {
 				Description    string   `json:"description"`
 				Argv           []string `json:"argv"`
 				PassEnv        []string `json:"pass_env,omitempty"`
 				TimeoutSeconds int      `json:"timeout_seconds,omitempty"`
 			}{tool.Description, argv, tool.PassEnv, tool.TimeoutSeconds})
+			if err != nil {
+				return nil, err
+			}
 			if err := WritePinnedConfiguration(state, configPath, []byte(config), "executable tool "+id); err != nil {
 				return nil, err
 			}
@@ -124,7 +127,11 @@ func PrepareTools(agent contracts.AgentSpec, env contracts.EnvironmentSpec, stat
 // Adding the built-in request tool does not change any user-granted backend.
 // Upgrade an existing pinned gateway only when its prior bytes match exactly.
 func writeToolGatewayConfig(state, path string, config toolgateway.Config) error {
-	current := []byte(contracts.JSONText(config))
+	text, err := contracts.JSONText(config)
+	if err != nil {
+		return err
+	}
+	current := []byte(text)
 	prior, err := ReadStateFile(state, path)
 	if errors.Is(err, os.ErrNotExist) {
 		return WritePinnedConfiguration(state, path, current, "tool gateway configuration")
@@ -137,7 +144,11 @@ func writeToolGatewayConfig(state, path string, config toolgateway.Config) error
 	}
 	legacy := config
 	legacy.Backends = config.Backends[:len(config.Backends)-1]
-	if !bytes.Equal(prior, []byte(contracts.JSONText(legacy))) {
+	legacyText, err := contracts.JSONText(legacy)
+	if err != nil {
+		return err
+	}
+	if !bytes.Equal(prior, []byte(legacyText)) {
 		return fault.New(fault.CodeEnvironmentDrift, "tool gateway configuration changed within this session")
 	}
 	return writeStateFile(state, path, current)

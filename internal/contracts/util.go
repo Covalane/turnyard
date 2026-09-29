@@ -17,39 +17,43 @@ import (
 
 func ErrorCode(err error) string { return string(fault.CodeOf(err)) }
 
-func JSONText(value any) string {
+func JSONText(value any) (string, error) {
 	data, err := json.Marshal(value)
 	if err != nil {
-		panic(err)
+		return "", fault.Wrap(fault.CodeInternalError, "encode JSON", err, "value cannot be encoded")
 	}
-	return string(data)
+	return string(data), nil
 }
 
-func NewID(prefix string) string {
+func NewID(prefix string) (string, error) {
+	return newID(prefix, rand.Reader)
+}
+
+func newID(prefix string, entropy io.Reader) (string, error) {
 	var bytes [8]byte
-	if _, err := rand.Read(bytes[:]); err != nil {
-		panic(err)
+	if _, err := io.ReadFull(entropy, bytes[:]); err != nil {
+		return "", fault.Wrap(fault.CodeInternalError, "generate ID", err, "random source unavailable")
 	}
-	return prefix + "_" + hex.EncodeToString(bytes[:])
+	return prefix + "_" + hex.EncodeToString(bytes[:]), nil
 }
 
-func Digest(value any) string {
+func Digest(value any) (string, error) {
 	data, err := json.Marshal(value)
 	if err != nil {
-		panic(err)
+		return "", fault.Wrap(fault.CodeInternalError, "encode digest input", err, "digest input cannot be encoded")
 	}
 	var normal any
 	decoder := json.NewDecoder(bytes.NewReader(data))
 	decoder.UseNumber() // Preserve integers above 2^53 during key ordering.
 	if err := decoder.Decode(&normal); err != nil {
-		panic(err)
+		return "", fault.Wrap(fault.CodeInternalError, "decode digest input", err, "digest input cannot be normalized")
 	}
 	canonical, err := json.Marshal(normal)
 	if err != nil {
-		panic(err)
+		return "", fault.Wrap(fault.CodeInternalError, "encode normalized digest input", err, "digest input cannot be normalized")
 	}
 	sum := sha256.Sum256(canonical)
-	return hex.EncodeToString(sum[:])
+	return hex.EncodeToString(sum[:]), nil
 }
 
 func FileDigest(path string) (string, error) {

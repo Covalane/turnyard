@@ -82,8 +82,16 @@ func generate(repoPath, output, objective, deliverable, backend, image, runtime,
 			return err
 		}
 	}
+	createID, err := contracts.NewID("create")
+	if err != nil {
+		return err
+	}
+	workID, err := contracts.NewID("work")
+	if err != nil {
+		return err
+	}
 	session := contracts.SessionSpec{
-		SchemaVersion: contracts.SessionVersion, IdempotencyKey: contracts.NewID("create"),
+		SchemaVersion: contracts.SessionVersion, IdempotencyKey: createID,
 		Repositories: []contracts.RepositorySpec{{ID: "app", Type: contracts.RepositorySourceLocalGit, Path: repoPath, Commit: head.Hash().String()}},
 		Environment:  "environment.json", PrimaryAgent: "lead",
 	}
@@ -98,7 +106,7 @@ func generate(repoPath, output, objective, deliverable, backend, image, runtime,
 		Checks: []contracts.CheckSpec{{ID: "go-test", Argv: []string{"go", "-C", "/workspace/app", "test", "./..."}, Repositories: []string{"app"}, TimeoutSeconds: 120}},
 	}
 	work := contracts.WorkSpec{
-		SchemaVersion: contracts.WorkVersion, IdempotencyKey: contracts.NewID("work"),
+		SchemaVersion: contracts.WorkVersion, IdempotencyKey: workID,
 		Objective: objective, CommitMessage: commitMessage, Acceptance: []string{"实现目标并通过 Go 测试"},
 		Checks: []string{"go-test"},
 	}

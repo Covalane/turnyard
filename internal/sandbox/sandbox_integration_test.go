@@ -99,7 +99,11 @@ case "network":
 	}
 	var timeoutName string
 	run := func(label string, override SandboxSpec, command []string, credential string, timeout time.Duration) (SandboxResult, error) {
-		name := "ty-go-" + label + "-" + contracts.NewID("x")
+		runID, err := contracts.NewID("x")
+		if err != nil {
+			return SandboxResult{}, err
+		}
+		name := "ty-go-" + label + "-" + runID
 		if label == "timeout" {
 			timeoutName = name
 		}
@@ -162,7 +166,10 @@ case "network":
 		}
 	}
 	oci := b
-	invocationID := contracts.NewID("orphan")
+	invocationID, err := contracts.NewID("orphan")
+	if err != nil {
+		t.Fatal(err)
+	}
 	orphanName := "ty-" + invocationID
 	defer oci.cleanup(context.Background(), orphanName)
 	if output, err := exec.Command(oci.dialect.Binary(), "run", "-d", "--name", orphanName,
@@ -178,7 +185,10 @@ case "network":
 	if oci.exists(context.Background(), orphanName) {
 		t.Fatal("orphan remains after recovery cleanup")
 	}
-	taskID := contracts.NewID("work")
+	taskID, err := contracts.NewID("work")
+	if err != nil {
+		t.Fatal(err)
+	}
 	checkName := "ty-check-" + taskID + "-probe"
 	defer oci.cleanup(context.Background(), checkName)
 	if output, err := exec.Command(oci.dialect.Binary(), "run", "-d", "--name", checkName,

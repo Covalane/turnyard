@@ -31,7 +31,10 @@ func TestRealOSSConnector(t *testing.T) {
 	requireCredential(t)
 	h := newHarness(t, "oss-go")
 	h.configEvidence()
-	marker := contracts.NewID("oss")
+	marker, err := contracts.NewID("oss")
+	if err != nil {
+		t.Fatal(err)
+	}
 	env := h.environment([]contracts.CheckSpec{{ID: "contains-marker", Argv: []string{"grep", "-Fq", marker, "/workspace/.turnyard-output/report"}, Repositories: []string{}}})
 	env.Git = contracts.GitPolicy{}
 	env.ArtifactConnectors = []contracts.ArtifactConnectorSpec{{

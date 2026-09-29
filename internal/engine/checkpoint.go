@@ -47,7 +47,10 @@ func (s *Service) saveCheckpoint(ctx context.Context, sid, tid string, session c
 	} else if err := agents.EnsureStateDirectory(state, state); err != nil {
 		return "", err
 	}
-	id := contracts.NewID("cp")
+	id, err := contracts.NewID("cp")
+	if err != nil {
+		return "", err
+	}
 	archive := filepath.Join(s.Store.Root, "checkpoints", id+".tar.gz")
 	hash, err := gitstate.CheckpointArchive(ctx, workspace, state, archive)
 	if err != nil {
@@ -58,7 +61,11 @@ func (s *Service) saveCheckpoint(ctx context.Context, sid, tid string, session c
 		return "", err
 	}
 	meta := map[string]any{"sha256": hash, "repositories": status, "native_id": native}
-	err = s.Store.SaveCheckpoint(ctx, store.CheckpointRecord{ID: id, SessionID: sid, TaskID: tid, Archive: archive, Metadata: contracts.JSONText(meta), SHA256: hash})
+	metadata, err := contracts.JSONText(meta)
+	if err != nil {
+		return "", err
+	}
+	err = s.Store.SaveCheckpoint(ctx, store.CheckpointRecord{ID: id, SessionID: sid, TaskID: tid, Archive: archive, Metadata: metadata, SHA256: hash})
 	if err == nil {
 		observe.Log.InfoContext(ctx, "checkpoint saved", "session_id", sid, "task_id", tid, "checkpoint_id", id, "sha256", hash)
 	}

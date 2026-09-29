@@ -121,7 +121,11 @@ func TestExistingToolGatewayGainsOnlyBuiltInInputTool(t *testing.T) {
 		t.Fatalf("current gateway config: %s %v", body, err)
 	}
 	current.Backends = current.Backends[:1]
-	if err := os.WriteFile(path, []byte(contracts.JSONText(current)), 0o600); err != nil {
+	previousJSON, err := contracts.JSONText(current)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(path, []byte(previousJSON), 0o600); err != nil {
 		t.Fatal(err)
 	}
 	if _, err := agents.PrepareTools(agent, env, state); err != nil {

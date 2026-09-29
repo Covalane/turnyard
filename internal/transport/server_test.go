@@ -27,7 +27,11 @@ func TestSupervisorPrunesOrphanedInputBatchOnStartup(t *testing.T) {
 	work := contracts.WorkSpec{Inputs: []contracts.InputSpec{{ID: "image", Source: contracts.InputSource{
 		Kind: contracts.InputStaged, Path: committedID + "/image",
 	}}}}
-	if _, err := state.AddTask(ctx, store.AddTaskInput{SessionID: "ses_kept", Key: "work", SpecJSON: contracts.JSONText(work), Digest: "digest"}); err != nil {
+	workJSON, err := contracts.JSONText(work)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := state.AddTask(ctx, store.AddTaskInput{SessionID: "ses_kept", Key: "work", SpecJSON: workJSON, Digest: "digest"}); err != nil {
 		t.Fatal(err)
 	}
 	if err := state.Close(); err != nil {
