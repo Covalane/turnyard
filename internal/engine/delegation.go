@@ -46,6 +46,18 @@ type delegationResponse struct {
 	Error  string `json:"error,omitempty"`
 }
 
+type delegationStatus struct {
+	DelegationID string             `json:"delegation_id"`
+	AgentID      string             `json:"agent_id"`
+	SessionID    string             `json:"session_id"`
+	TaskID       string             `json:"task_id"`
+	Status       string             `json:"status"`
+	ErrorCode    string             `json:"error_code"`
+	Candidate    *CandidateResult   `json:"candidate,omitempty"`
+	Handoff      *delegationHandoff `json:"handoff,omitempty"`
+	HandoffError string             `json:"handoff_error,omitempty"`
+}
+
 type delegationServer struct {
 	service     *Service
 	parent      turnExecution
@@ -126,7 +138,7 @@ func (d *delegationServer) submit(ctx context.Context, key string, req delegatio
 		}
 		if len(tasks) == 1 {
 			if tasks[0].Status == lifecycle.Queued {
-				d.runChild(tasks[0].ID, "", false, req.TimeoutSeconds)
+				d.runChild(ctx, tasks[0].ID, "", false, req.TimeoutSeconds)
 			}
 			return d.status(ctx, key)
 		}
@@ -214,7 +226,7 @@ func (d *delegationServer) submit(ctx context.Context, key string, req delegatio
 		return nil, err
 	}
 	if added.Status == lifecycle.Queued {
-		d.runChild(added.TaskID, "", false, req.TimeoutSeconds)
+		d.runChild(ctx, added.TaskID, "", false, req.TimeoutSeconds)
 	}
 	observe.Log.InfoContext(ctx, "delegation submitted", "parent_task_id", d.parent.task.ID,
 		"child_session_id", created.SessionID, "child_task_id", added.TaskID, "agent_id", childAgent.ID)
@@ -286,15 +298,15 @@ func (d *delegationServer) status(ctx context.Context, key string) (any, error) 
 	if err != nil {
 		return nil, err
 	}
-	result := map[string]any{"delegation_id": childSession.ID, "agent_id": childSession.DelegateAgentID.Value,
-		"session_id": childSession.ID, "task_id": childTask.ID, "status": childTask.Status,
-		"error_code": childTask.ErrorCode.Value}
+	result := delegationStatus{DelegationID: childSession.ID, AgentID: childSession.DelegateAgentID.Value,
+		SessionID: childSession.ID, TaskID: childTask.ID, Status: childTask.Status,
+		ErrorCode: childTask.ErrorCode.Value}
 	if childTask.CandidateID.Present {
 		taskResult, err := d.service.TaskResult(ctx, childTask.ID)
 		if err != nil {
 			return nil, err
 		}
-		result["candidate"] = taskResult.Candidate
+		result.Candidate = taskResult.Candidate
 		if childTask.Status == lifecycle.Verified && taskResult.Candidate != nil && taskResult.Candidate.Status == lifecycle.Verified {
 			handoff, err := d.exportHandoff(ctx, childSession, taskResult.Candidate)
 			if err != nil {
@@ -302,15 +314,15 @@ func (d *delegationServer) status(ctx context.Context, key string) (any, error) 
 					if failErr := d.service.Store.FailDelegationHandoff(ctx, childSession.ID, childTask.ID, taskResult.Candidate.ID); failErr != nil {
 						return nil, failErr
 					}
-					result["status"] = lifecycle.Failed
-					result["error_code"] = fault.CodeHandoffUnavailable
+					result.Status = lifecycle.Failed
+					result.ErrorCode = string(fault.CodeHandoffUnavailable)
 					taskResult.Candidate.Status = lifecycle.Failed
 				} else {
-					result["status"] = DelegationHandoffUnavailable
+					result.Status = DelegationHandoffUnavailable
 				}
-				result["handoff_error"] = err.Error()
+				result.HandoffError = err.Error()
 			} else {
-				result["handoff"] = handoff
+				result.Handoff = &handoff
 				if childSession.Status != lifecycle.Completed {
 					if _, err := d.service.completeSession(ctx, childSession.ID, true); err != nil {
 						return nil, err
@@ -328,7 +340,7 @@ func (d *delegationServer) continueTask(ctx context.Context, key string, req del
 		return nil, err
 	}
 	if task.Status == lifecycle.NeedsInput && req.Reply != "" && !req.Retry || task.Status == lifecycle.Failed && req.Retry && req.Reply == "" {
-		if !d.runChild(task.ID, req.Reply, req.Retry, req.TimeoutSeconds) {
+		if !d.runChild(ctx, task.ID, req.Reply, req.Retry, req.TimeoutSeconds) {
 			return nil, fault.New(fault.CodeConcurrentRun, "delegated task is still settling")
 		}
 		return d.status(ctx, key)
@@ -336,7 +348,7 @@ func (d *delegationServer) continueTask(ctx context.Context, key string, req del
 	return nil, fault.New(fault.CodeInvalidTransition, "delegation cannot continue from %s; unknown requires operator reconciliation", task.Status)
 }
 
-func (d *delegationServer) runChild(taskID, reply string, retry bool, seconds int) bool {
+func (d *delegationServer) runChild(parent context.Context, taskID, reply string, retry bool, seconds int) bool {
 	d.service.delegationMu.Lock()
 	if !d.service.activeChildTasks.Add(taskID) {
 		d.service.delegationMu.Unlock()
@@ -357,7 +369,7 @@ func (d *delegationServer) runChild(taskID, reply string, retry bool, seconds in
 			d.service.activeChildTasks.Remove(taskID)
 			d.service.delegationMu.Unlock()
 		}()
-		ctx := observe.WithIDs(context.Background(), observe.IDs{TaskID: taskID})
+		ctx := observe.WithIDs(context.WithoutCancel(parent), observe.IDs{TaskID: taskID})
 		_, err := d.service.RunTask(ctx, taskID, reply, retry, time.Duration(seconds)*time.Second)
 		if err != nil {
 			observe.LogFailure(ctx, "delegation run failed", fault.Ensure(err, "run delegated task"))

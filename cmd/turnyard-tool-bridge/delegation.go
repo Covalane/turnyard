@@ -1,7 +1,6 @@
 package main
 
 import (
-	"bufio"
 	"context"
 	"crypto/rand"
 	"encoding/hex"
@@ -21,69 +20,37 @@ var invocationPattern = regexp.MustCompile(`^inv_[a-f0-9]{16}$`)
 // The bridge writes a request to its invocation directory and reads a response
 // from a separate read-only mount. It never sees the supervisor control socket.
 func serveDelegation(in io.Reader, out io.Writer) error {
-	scanner := bufio.NewScanner(in)
-	scanner.Buffer(make([]byte, 4096), maxRequestBytes)
-	writer := bufio.NewWriter(out)
-	for scanner.Scan() {
-		var req request
-		if json.Unmarshal(scanner.Bytes(), &req) != nil || req.JSONRPC != mcpJSONRPCVersion || len(req.ID) == 0 || string(req.ID) == "null" {
-			continue
-		}
-		response := map[string]any{"jsonrpc": mcpJSONRPCVersion, "id": req.ID}
-		switch req.Method {
-		case mcpMethodInitialize:
-			response["result"] = map[string]any{"protocolVersion": mcpProtocolVersion, "capabilities": map[string]any{"tools": map[string]any{}}, "serverInfo": map[string]string{"name": "turnyard-delegation", "version": "1.0.0"}}
-		case mcpMethodToolsList:
-			response["result"] = map[string]any{"tools": []any{map[string]any{
-				"name": mcpToolDelegate, "description": "Launch, inspect or continue a managed child agent. For submit, copy the complete actionable child objective and concrete acceptance conditions from the parent task; short placeholders such as x/y are rejected. Include a stable key, allowed agent_id, full repository scope and at least one check or deliverable. The child works in an isolated session. status reads its candidate-bound result. continue resumes needs_input with reply or failed with retry=true. Never invent an additional byte count or conflicting requirement.",
-				"inputSchema": map[string]any{"type": "object", "additionalProperties": false, "required": []string{"action", "key"}, "properties": map[string]any{
-					"action": map[string]any{"enum": []contracts.DelegationAction{contracts.DelegationActionSubmit, contracts.DelegationActionStatus, contracts.DelegationActionContinue}},
-					"key":    map[string]string{"type": "string"}, "agent_id": map[string]string{"type": "string"},
-					"objective":    map[string]any{"type": "string", "minLength": 2, "description": "Complete child task objective; never a placeholder"},
-					"acceptance":   map[string]any{"type": "array", "minItems": 1, "items": map[string]any{"type": "string", "minLength": 2}},
-					"scope":        map[string]any{"type": "array", "items": map[string]any{"type": "object", "required": []string{"id", "mode"}, "additionalProperties": false, "properties": map[string]any{"id": map[string]string{"type": "string"}, "mode": map[string]any{"enum": []contracts.ScopeMode{contracts.ScopeRead, contracts.ScopeWrite}}}}},
-					"checks":       map[string]any{"type": "array", "items": map[string]string{"type": "string"}},
-					"deliverables": map[string]any{"type": "array", "items": map[string]string{"type": "object"}},
-					"input_ids":    map[string]any{"type": "array", "items": map[string]string{"type": "string"}},
-					"reply":        map[string]string{"type": "string"}, "retry": map[string]string{"type": "boolean"},
-					"timeout_seconds": map[string]any{"type": "integer", "minimum": 1, "maximum": 7200},
-				}, "allOf": []any{map[string]any{"if": map[string]any{"properties": map[string]any{"action": map[string]contracts.DelegationAction{"const": contracts.DelegationActionSubmit}}},
-					"then": map[string]any{"required": []string{"key", "agent_id", "objective", "acceptance", "scope"}}}},
-				},
-			}}}
-		case mcpMethodToolsCall:
-			var params struct {
-				Name      string          `json:"name"`
-				Arguments json.RawMessage `json:"arguments"`
-			}
-			if json.Unmarshal(req.Params, &params) != nil || params.Name != mcpToolDelegate || len(params.Arguments) > maxRequestBytes {
-				response["error"] = map[string]any{"code": -32602, "message": "invalid delegation arguments"}
-			} else {
-				result, err := callDelegation(params.Arguments)
-				if err != nil {
-					response["result"] = map[string]any{"content": []any{map[string]string{"type": "text", "text": err.Error()}}, "isError": true}
-				} else {
-					response["result"] = map[string]any{"content": []any{map[string]string{"type": "text", "text": string(result)}}}
-				}
-			}
-		default:
-			response["error"] = map[string]any{"code": -32601, "message": "Method not found"}
-		}
-		body, err := json.Marshal(response)
-		if err != nil {
-			return err
-		}
-		if _, err := writer.Write(body); err != nil {
-			return err
-		}
-		if err := writer.WriteByte('\n'); err != nil {
-			return err
-		}
-		if err := writer.Flush(); err != nil {
-			return err
-		}
+	tool := mcpToolDefinition{
+		Name: mcpToolDelegate, Description: "Launch, inspect or continue a managed child agent. For submit, copy the complete actionable child objective and concrete acceptance conditions from the parent task; short placeholders such as x/y are rejected. Include a stable key, allowed agent_id, full repository scope and at least one check or deliverable. The child works in an isolated session. status reads its candidate-bound result. continue resumes needs_input with reply or failed with retry=true. Never invent an additional byte count or conflicting requirement.",
+		InputSchema: map[string]any{"type": "object", "additionalProperties": false, "required": []string{"action", "key"}, "properties": map[string]any{
+			"action": map[string]any{"enum": []contracts.DelegationAction{contracts.DelegationActionSubmit, contracts.DelegationActionStatus, contracts.DelegationActionContinue}},
+			"key":    map[string]string{"type": "string"}, "agent_id": map[string]string{"type": "string"},
+			"objective":    map[string]any{"type": "string", "minLength": 2, "description": "Complete child task objective; never a placeholder"},
+			"acceptance":   map[string]any{"type": "array", "minItems": 1, "items": map[string]any{"type": "string", "minLength": 2}},
+			"scope":        map[string]any{"type": "array", "items": map[string]any{"type": "object", "required": []string{"id", "mode"}, "additionalProperties": false, "properties": map[string]any{"id": map[string]string{"type": "string"}, "mode": map[string]any{"enum": []contracts.ScopeMode{contracts.ScopeRead, contracts.ScopeWrite}}}}},
+			"checks":       map[string]any{"type": "array", "items": map[string]string{"type": "string"}},
+			"deliverables": map[string]any{"type": "array", "items": map[string]string{"type": "object"}},
+			"input_ids":    map[string]any{"type": "array", "items": map[string]string{"type": "string"}},
+			"reply":        map[string]string{"type": "string"}, "retry": map[string]string{"type": "boolean"},
+			"timeout_seconds": map[string]any{"type": "integer", "minimum": 1, "maximum": 7200},
+		}, "allOf": []any{map[string]any{"if": map[string]any{"properties": map[string]any{"action": map[string]contracts.DelegationAction{"const": contracts.DelegationActionSubmit}}},
+			"then": map[string]any{"required": []string{"key", "agent_id", "objective", "acceptance", "scope"}}}},
+		},
 	}
-	return scanner.Err()
+	return serveMCP(in, out, mcpServer{name: "turnyard-delegation", tool: tool, call: func(raw json.RawMessage) (any, *mcpRPCError) {
+		var params struct {
+			Name      string          `json:"name"`
+			Arguments json.RawMessage `json:"arguments"`
+		}
+		if json.Unmarshal(raw, &params) != nil || params.Name != mcpToolDelegate || len(params.Arguments) > maxRequestBytes {
+			return nil, &mcpRPCError{Code: mcpInvalidParams, Message: "invalid delegation arguments"}
+		}
+		result, err := callDelegation(params.Arguments)
+		if err != nil {
+			return textResult(err.Error(), true), nil
+		}
+		return textResult(string(result), false), nil
+	}})
 }
 
 func callDelegation(args json.RawMessage) (json.RawMessage, error) {

@@ -46,12 +46,12 @@ func TestExecutableFailureAndCredentialFiltering(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	text := result["content"].([]any)[0].(map[string]string)["text"]
+	text := result.Content[0].Text
 	if !strings.Contains(text, "TURNYARD_TOOL_TEST_ALLOWED=visible") || strings.Contains(text, "TURNYARD_TOOL_TEST_HIDDEN") {
 		t.Fatalf("tool environment was not filtered: %s", text)
 	}
 	result, err = call(params, toolConfig{Description: "Fail", Argv: []string{"false"}})
-	if err != nil || result["isError"] != true {
+	if err != nil || !result.IsError {
 		t.Fatalf("nonzero exit was not reported: %+v %v", result, err)
 	}
 }
@@ -60,7 +60,7 @@ func TestExecutableTimeoutIsReturnedAsToolError(t *testing.T) {
 	start := time.Now()
 	result, err := call(json.RawMessage(`{"name":"run","arguments":{}}`),
 		toolConfig{Description: "Sleep", Argv: []string{"sleep", "5"}, TimeoutSeconds: 1})
-	if err != nil || result["isError"] != true || time.Since(start) > 3*time.Second {
+	if err != nil || !result.IsError || time.Since(start) > 3*time.Second {
 		t.Fatalf("timed out command was not stopped: %+v %v", result, err)
 	}
 }

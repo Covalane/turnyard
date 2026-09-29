@@ -4,7 +4,6 @@
 package main
 
 import (
-	"bufio"
 	"bytes"
 	"context"
 	"encoding/json"
@@ -98,54 +97,20 @@ func main() {
 }
 
 func serve(in io.Reader, out io.Writer, config toolConfig) error {
-	scanner := bufio.NewScanner(in)
-	scanner.Buffer(make([]byte, 4096), maxRequestBytes)
-	writer := bufio.NewWriter(out)
-	for scanner.Scan() {
-		var req request
-		if err := json.Unmarshal(scanner.Bytes(), &req); err != nil || req.JSONRPC != mcpJSONRPCVersion || req.Method == "" {
-			continue
-		}
-		if len(req.ID) == 0 || string(req.ID) == "null" {
-			continue
-		}
-		response := map[string]any{"jsonrpc": mcpJSONRPCVersion, "id": req.ID}
-		switch req.Method {
-		case mcpMethodInitialize:
-			response["result"] = map[string]any{"protocolVersion": mcpProtocolVersion, "capabilities": map[string]any{"tools": map[string]any{}}, "serverInfo": map[string]string{"name": "turnyard-tool-bridge", "version": "1.0.0"}}
-		case mcpMethodToolsList:
-			response["result"] = map[string]any{"tools": []any{map[string]any{"name": mcpToolRun, "description": config.Description,
-				"inputSchema": map[string]any{"type": "object", "additionalProperties": false, "properties": map[string]any{
-					"args":  map[string]any{"type": "array", "items": map[string]string{"type": "string"}, "description": "Additional command arguments"},
-					"stdin": map[string]string{"type": "string", "description": "Optional text sent to standard input"}}}}}}
-		case mcpMethodToolsCall:
-			result, err := call(req.Params, config)
-			if err != nil {
-				response["error"] = map[string]any{"code": -32602, "message": err.Error()}
-			} else {
-				response["result"] = result
-			}
-		default:
-			response["error"] = map[string]any{"code": -32601, "message": "Method not found"}
-		}
-		body, err := json.Marshal(response)
+	tool := mcpToolDefinition{Name: mcpToolRun, Description: config.Description,
+		InputSchema: map[string]any{"type": "object", "additionalProperties": false, "properties": map[string]any{
+			"args":  map[string]any{"type": "array", "items": map[string]string{"type": "string"}, "description": "Additional command arguments"},
+			"stdin": map[string]string{"type": "string", "description": "Optional text sent to standard input"}}}}
+	return serveMCP(in, out, mcpServer{name: "turnyard-tool-bridge", tool: tool, call: func(raw json.RawMessage) (any, *mcpRPCError) {
+		result, err := call(raw, config)
 		if err != nil {
-			return err
+			return nil, &mcpRPCError{Code: mcpInvalidParams, Message: err.Error()}
 		}
-		if _, err := writer.Write(body); err != nil {
-			return err
-		}
-		if err := writer.WriteByte('\n'); err != nil {
-			return err
-		}
-		if err := writer.Flush(); err != nil {
-			return err
-		}
-	}
-	return scanner.Err()
+		return result, nil
+	}})
 }
 
-func call(raw json.RawMessage, config toolConfig) (map[string]any, error) {
+func call(raw json.RawMessage, config toolConfig) (mcpToolResult, error) {
 	var params struct {
 		Name      string `json:"name"`
 		Arguments struct {
@@ -154,11 +119,11 @@ func call(raw json.RawMessage, config toolConfig) (map[string]any, error) {
 		} `json:"arguments"`
 	}
 	if err := json.Unmarshal(raw, &params); err != nil || params.Name != mcpToolRun || len(params.Arguments.Args) > 64 || len(params.Arguments.Stdin) > maxRequestBytes {
-		return nil, fmt.Errorf("invalid executable tool arguments")
+		return mcpToolResult{}, fmt.Errorf("invalid executable tool arguments")
 	}
 	for _, arg := range params.Arguments.Args {
 		if len(arg) > 8192 || strings.ContainsRune(arg, 0) {
-			return nil, fmt.Errorf("invalid executable tool argument")
+			return mcpToolResult{}, fmt.Errorf("invalid executable tool argument")
 		}
 	}
 	timeout := config.TimeoutSeconds
@@ -193,5 +158,5 @@ func call(raw json.RawMessage, config toolConfig) (map[string]any, error) {
 	if message == "" {
 		message = "command completed without output"
 	}
-	return map[string]any{"content": []any{map[string]string{"type": "text", "text": message}}, "isError": err != nil}, nil
+	return textResult(message, err != nil), nil
 }

@@ -1,6 +1,7 @@
 package contracts
 
 import (
+	"bytes"
 	"crypto/rand"
 	"crypto/sha256"
 	"encoding/hex"
@@ -38,7 +39,9 @@ func Digest(value any) string {
 		panic(err)
 	}
 	var normal any
-	if err := json.Unmarshal(data, &normal); err != nil {
+	decoder := json.NewDecoder(bytes.NewReader(data))
+	decoder.UseNumber() // Preserve integers above 2^53 during key ordering.
+	if err := decoder.Decode(&normal); err != nil {
 		panic(err)
 	}
 	canonical, err := json.Marshal(normal)

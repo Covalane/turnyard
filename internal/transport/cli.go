@@ -323,14 +323,18 @@ func runCLI(ctx context.Context, args []string) (map[string]any, error) {
 				if err != nil {
 					return nil, err
 				}
-				task, ok := result["task"].(map[string]any)
-				if ok && result["active"] == false {
-					status, _ := task["status"].(string)
-					if lifecycle.WaitStops(status) {
-						return result, nil
-					}
+				done, err := taskWaitDone(result)
+				if err != nil {
+					return nil, err
 				}
-				time.Sleep(time.Second)
+				if done {
+					return result, nil
+				}
+				select {
+				case <-ctx.Done():
+					return nil, ctx.Err()
+				case <-time.After(time.Second):
+				}
 			}
 		}
 	case cliCommandCheckpoint:
@@ -340,6 +344,19 @@ func runCLI(ctx context.Context, args []string) (map[string]any, error) {
 	}
 	return nil, fault.New(fault.CodeInvalidRequest, "unknown command")
 }
+
+// taskWaitDone is the only place the dynamic CLI response is interpreted as a
+// task state. A malformed response must fail instead of polling forever.
+func taskWaitDone(result map[string]any) (bool, error) {
+	task, taskOK := result["task"].(map[string]any)
+	active, activeOK := result["active"].(bool)
+	status, statusOK := task["status"].(string)
+	if !taskOK || !activeOK || !statusOK || status == "" {
+		return false, fault.New(fault.CodeDaemonUnavailable, "invalid task status response")
+	}
+	return !active && lifecycle.WaitStops(status), nil
+}
+
 func CLI(ctx context.Context, args []string, stdout, stderr io.Writer) int {
 	result, err := runCLI(ctx, args)
 	if err != nil {

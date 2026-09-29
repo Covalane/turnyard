@@ -324,9 +324,9 @@ func TestDelegationHandoffRecovery(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			status := response.(map[string]any)
+			status := response.(delegationStatus)
 			if failure == "deterministic" {
-				if status["status"] != lifecycle.Failed || status["error_code"] != fault.CodeHandoffUnavailable {
+				if status.Status != lifecycle.Failed || status.ErrorCode != string(fault.CodeHandoffUnavailable) {
 					t.Fatalf("deterministic handoff failure was not retryable: %v", status)
 				}
 				if _, err := f.service.CompleteSession(ctx, child.SessionID); fault.CodeOf(err) != fault.CodeInvalidTransition {
@@ -337,7 +337,7 @@ func TestDelegationHandoffRecovery(t *testing.T) {
 					t.Fatalf("same child did not produce a new candidate: %+v %v", retried, err)
 				}
 			} else {
-				if status["status"] != "handoff_unavailable" {
+				if status.Status != DelegationHandoffUnavailable {
 					t.Fatalf("transient handoff error was not preserved: %v", status)
 				}
 				if err := os.Remove(filepath.Join(control, "delegations")); err != nil {
@@ -348,8 +348,8 @@ func TestDelegationHandoffRecovery(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			status = response.(map[string]any)
-			if status["status"] != lifecycle.Verified || status["handoff"] == nil {
+			status = response.(delegationStatus)
+			if status.Status != lifecycle.Verified || status.Handoff == nil {
 				t.Fatalf("handoff did not recover: %v", status)
 			}
 			childRow, err := f.service.Store.Session(ctx, child.SessionID)

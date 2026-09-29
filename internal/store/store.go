@@ -102,34 +102,6 @@ type EventRow struct {
 	CreatedAt float64 `json:"created_at"`
 }
 
-func nullableString(x OptionalString) any {
-	if x.Present {
-		return x.Value
-	}
-	return nil
-}
-func nullableInt(x OptionalInt) any {
-	if x.Present {
-		return x.Value
-	}
-	return nil
-}
-func nullableFloat(x OptionalFloat) any {
-	if x.Present {
-		return x.Value
-	}
-	return nil
-}
-func (x SessionRow) MarshalJSON() ([]byte, error) {
-	return json.Marshal(map[string]any{"id": x.ID, "spec": x.Spec, "environment": x.Environment,
-		"environment_digest": x.EnvironmentDigest, "workspace": x.Workspace, "status": x.Status,
-		"native_id": nullableString(x.NativeID), "created_at": x.CreatedAt, "completed_at": nullableFloat(x.CompletedAt),
-		"cancelled_at": nullableFloat(x.CancelledAt), "cancel_reason": nullableString(x.CancelReason),
-		"parent_session_id": nullableString(x.ParentSessionID), "parent_task_id": nullableString(x.ParentTaskID),
-		"parent_invocation_id": nullableString(x.ParentInvocationID), "delegate_agent_id": nullableString(x.DelegateAgentID),
-		"delegation_request_digest": nullableString(x.DelegationRequestDigest)})
-}
-
 type TaskRow struct {
 	ID             string         `json:"id"`
 	SessionID      string         `json:"session_id"`
@@ -141,13 +113,6 @@ type TaskRow struct {
 	CandidateID    OptionalString `json:"candidate_id"`
 	ErrorCode      OptionalString `json:"error_code"`
 	CreatedAt      float64        `json:"created_at"`
-}
-
-func (x TaskRow) MarshalJSON() ([]byte, error) {
-	return json.Marshal(map[string]any{"id": x.ID, "session_id": x.SessionID, "sequence": x.Sequence,
-		"idempotency_key": x.IdempotencyKey, "spec": x.Spec, "spec_digest": x.SpecDigest,
-		"status": x.Status, "candidate_id": nullableString(x.CandidateID),
-		"error_code": nullableString(x.ErrorCode), "created_at": x.CreatedAt})
 }
 
 type CandidateRow struct {
@@ -172,12 +137,4 @@ type InvocationRow struct {
 	LogPath        OptionalString `json:"log_path"`
 	StartedAt      float64        `json:"started_at"`
 	EndedAt        OptionalFloat  `json:"ended_at"`
-}
-
-func (x InvocationRow) MarshalJSON() ([]byte, error) {
-	return json.Marshal(map[string]any{"id": x.ID, "turn_id": x.TurnID, "runtime": x.Runtime,
-		"model": x.Model, "sandbox_backend": x.SandboxBackend, "status": x.Status,
-		"exit_code": nullableInt(x.ExitCode), "native_id": nullableString(x.NativeID),
-		"log_path": nullableString(x.LogPath), "started_at": x.StartedAt,
-		"ended_at": nullableFloat(x.EndedAt)})
 }
