@@ -6,6 +6,8 @@
 
 历史验收发生于 2026-09-26 至 29 日，覆盖 macOS Apple Silicon、Docker Desktop 内的 Linux/arm64、Apple `container` 和 Podman 等环境。不同记录对应不同源码与镜像版本，不能合并为一次发布验收。原始调用日志、临时数据库和模型输出保存在执行机的被忽略状态目录，**未随开源仓库发布，因此读者不能仅凭本文独立审计那些历史运行**。
 
+2026-10-11 的 F1–F7 修复及当前 Go、镜像和 Docker 复验，单独记录在[审查报告的修复与复验部分](reviews/2026-10-11-full-review.md#修复与复验2026-10-11)。该轮通过新镜像上的 CLI 启动、内置人工输入与 Docker 边界探针，没有重跑下表中的云模型与外部服务验收。
+
 ## 已验证的路径
 
 | 路径 | 历史结果与边界 |
@@ -37,10 +39,15 @@
 go generate ./internal/store
 go test -race ./...
 go vet ./...
-go test -tags integration -run '^$' ./test/...
+go tool staticcheck ./...
+go tool govulncheck ./...
+go vet -tags integration ./...
+go test -tags integration -run '^$' ./...
 ```
 
 最后一条只验证带 `integration` 标签的测试能够编译，**不代表真实代理、OCI 或 OSS 验收通过**。
+
+Ent、Staticcheck 和 Govulncheck 使用 `go.mod` 的 `tool` 声明固定版本，`go generate` 和 CI 使用同一组依赖。当前采用 `golang.org/x/tools` 0.52.0 支持 Go 1.27.2 的导出格式；Staticcheck 0.8.1 尚不兼容，因此固定上游提交 `452d5bb86b45`，没有使用浮动的 `@master`。后续正式版本包含兼容修复后，再更新固定版本并复验。
 
 真实测试由开关显式启用。先设置 `TURNYARD_E2E_PROVIDER`、`TURNYARD_E2E_MODEL`，并将 `TURNYARD_E2E_CREDENTIAL_ENV` 设为自己已有的凭据环境变量名，再运行：
 
@@ -51,3 +58,5 @@ TURNYARD_DELEGATION_RECOVERY_E2E=1 TURNYARD_E2E_BACKEND=docker go test -tags int
 ```
 
 可用 `TURNYARD_E2E_RUNTIME`、`TURNYARD_E2E_BACKEND` 和 `TURNYARD_E2E_IMAGE` 选择执行路径；恢复测试还必须设置子代理的 `TURNYARD_DELEGATION_CHILD_PROVIDER`、`TURNYARD_DELEGATION_CHILD_MODEL` 和 `TURNYARD_DELEGATION_CHILD_CREDENTIAL_ENV`。聊天室测试需要 `TURNYARD_CHAT_PROVIDER`、`TURNYARD_CHAT_MODEL` 和 `TURNYARD_CHAT_CREDENTIAL_ENV`；模型排序测试需要 `TURNYARD_MATCHER_ENDPOINT`、`TURNYARD_MATCHER_MODEL` 和 `TURNYARD_MATCHER_CREDENTIAL_ENV`；PR 读回需要 `TURNYARD_GITHUB_PR_URL` 与 `TURNYARD_GITHUB_REPOSITORY_URL`。操作者应先准备沙箱镜像和可用权限，测试失败时保留失败状态，不把跳过计为通过。
+
+OSS 测试还需设置 `TURNYARD_OSS_E2E_PREFIX`、`TURNYARD_OSS_E2E_REGION` 和绝对路径 `TURNYARD_OSS_E2E_CONNECTOR`。该可信适配程序接受 `get <uri> <file>`（确认缺失时退出 44）和 `create <uri> <file>`（服务端原子拒绝覆盖）；原始 CLI 的统一失败码不能作为缺失码。独立读回及清理仍使用宿主已配置的 `aliyun` CLI。

@@ -19,10 +19,10 @@ Turnyard 把能力分为代理运行时、Skill、工具、沙箱资源和宿主
 默认匹配使用本地关键词，不调用额外模型。可选配置让网关在关键词结果不足或接近时，用指定的 OpenAI Chat 兼容模型为**已授权工具**排序；模型失败则退回本地搜索，模型返回的陌生 ID 会被丢弃。模型不会直接执行工具。当前模型排序最多处理 64 个授权工具，更大的目录仍使用本地搜索。
 
 ```json
-"tool_search": {"mode": "llm-rerank", "model_binding": "search-model"}
+{"tool_search": {"mode": "llm-rerank", "model_binding": "search-model"}}
 ```
 
-`search-model` 必须是 `model_bindings` 中支持 OpenAI Chat 接口的一项。省略 `tool_search` 等同本地关键词模式；`network: "none"` 不接受模型排序。
+将上述片段加入 Environment；`search-model` 必须是 `model_bindings` 中支持 OpenAI Chat 接口的一项。省略 `tool_search` 等同本地关键词模式；`network: "none"` 不接受模型排序。
 
 ## 两种工具来源
 
@@ -37,7 +37,7 @@ Turnyard 把能力分为代理运行时、Skill、工具、沙箱资源和宿主
 
 Docker 工具容器只挂载工具配置、工具包和独立工具状态，不挂载代理原生会话状态；代理也看不到目录摘要锁。工具容器目前没有逐工具的出站域名白名单，具备的网络访问仍需由部署方的网络策略约束。
 
-独立工具状态与目录摘要锁随会话保留，但不会随代理工作区检查点一起回滚。恢复后涉及外部写入的工具调用仍须核查其外部结果，再决定是否重试。
+独立工具状态与目录摘要锁随会话保留，它们不包含在代理工作区检查点中，恢复不会重置这些状态。恢复后涉及外部写入的工具调用仍须核查其外部结果，再决定是否重试。
 
 ### 已验证的可执行工具
 
@@ -59,7 +59,7 @@ Docker 工具容器只挂载工具配置、工具包和独立工具状态，不�
 
 运行前，宿主环境需要提供 `TURNYARD_EXEC_WITNESS_MODE=enabled`。代理先用 `find_tools` 搜索，再调用 `call_tool`，传入 `{"tool_id":"stamp_cli/run","arguments":{"args":["alpha"]}}`。桥接器把声明的变量交给脚本，脚本返回 `EXEC_WITNESS:alpha`；代理把它写入仓库，Turnyard 对候选代码运行独立检查。具体真实模型验收情况见[验证记录](validation.md)。这是环境 JSON 的片段；完整文件还需要沙箱和模型绑定。只有包含 Git 仓库的会话才需要 Git 策略。
 
-例如要让代理调用 `ossutil`，可将它安装在镜像中，配置 `kind: "executable"`、`argv: ["ossutil"]`、清楚的 `description` 和所需 `pass_env`。模型会通过 `run.args` 提交子命令。用于**最终文件交付**时，通常应优先使用 [宿主侧交付连接器](lifecycle.md)：由 Turnyard 在检查通过后上传并读回校验，避免把交付是否成功完全交给代理的文字报告。真实 OSS 桶已验证上传与双重读回；测试对象清理因当前账号缺少删除权限而失败，见[验证记录](validation.md)。
+例如要让代理调用 `ossutil`，可将它安装在镜像中，配置 `kind: "executable"`、`argv: ["ossutil"]`、清楚的 `description` 和所需 `pass_env`。模型会通过 `run.args` 提交子命令。用于**最终文件交付**时，通常应优先使用 [宿主侧交付连接器](lifecycle.md)：由 Turnyard 在检查通过后上传并读回校验，避免把交付是否成功完全交给代理的文字报告。历史验收曾完成真实 OSS 上传与双重读回，清理因当时账号缺少删除权限而失败；这不代表本轮原子创建契约已通过真实 OSS 复验，见[验证记录](validation.md)。
 
 ## Skill、沙箱与记录
 

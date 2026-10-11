@@ -28,6 +28,10 @@ func TestRealOSSConnector(t *testing.T) {
 	if _, err := exec.LookPath("aliyun"); err != nil {
 		t.Fatalf("aliyun CLI is required: %v", err)
 	}
+	adapter := os.Getenv("TURNYARD_OSS_E2E_CONNECTOR")
+	if !filepath.IsAbs(adapter) {
+		t.Fatal("TURNYARD_OSS_E2E_CONNECTOR must name a trusted adapter: get exits 44 only for NoSuchKey; create atomically rejects existing keys")
+	}
 	requireCredential(t)
 	h := newHarness(t, "oss-go")
 	h.configEvidence()
@@ -39,9 +43,12 @@ func TestRealOSSConnector(t *testing.T) {
 	env.Git = contracts.GitPolicy{}
 	env.ArtifactConnectors = []contracts.ArtifactConnectorSpec{{
 		ID: "oss", URIPrefix: prefix,
-		GetArgv:        []string{"aliyun", "ossutil", "cp", "{uri}", "{file}", "--region", region, "-f"},
-		PutArgv:        []string{"aliyun", "ossutil", "cp", "{file}", "{uri}", "--region", region, "--ignore-existing", "-f"},
-		TimeoutSeconds: 90,
+		GetArgv:           []string{adapter, "get", "{uri}", "{file}"},
+		PutArgv:           []string{adapter, "create", "{uri}", "{file}"},
+		PutMode:           contracts.ConnectorPutCreateOnly,
+		NotFoundExitCodes: []int{44},
+		PassEnv:           []string{"TURNYARD_OSS_E2E_REGION"},
+		TimeoutSeconds:    90,
 	}}
 	h.save("environment.json", env)
 	session := contracts.SessionSpec{SchemaVersion: contracts.SessionVersion, IdempotencyKey: "real-oss-connector",

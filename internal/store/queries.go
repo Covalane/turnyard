@@ -181,14 +181,23 @@ func (s *Store) FirstCandidateBases(ctx context.Context, taskID string) (map[str
 type CheckpointRow struct{ ID, SessionID, TaskID, Archive, Metadata string }
 
 func (s *Store) LatestCheckpointMetadata(ctx context.Context, sid string) (string, bool, error) {
-	x, err := s.client.Checkpoint.Query().Where(checkpoint.SessionIDEQ(sid)).Order(ent.Desc(checkpoint.FieldCreatedAt)).First(ctx)
+	x, found, err := s.LatestCheckpoint(ctx, sid)
+	return x.Metadata, found, err
+}
+
+func (s *Store) LatestCheckpoint(ctx context.Context, sid string) (CheckpointRow, bool, error) {
+	x, err := s.client.Checkpoint.Query().Where(checkpoint.SessionIDEQ(sid)).Order(ent.Desc(checkpoint.FieldCreatedAt), ent.Desc(checkpoint.FieldID)).First(ctx)
 	if ent.IsNotFound(err) {
-		return "", false, nil
+		return CheckpointRow{}, false, nil
 	}
 	if err != nil {
-		return "", false, err
+		return CheckpointRow{}, false, err
 	}
-	return x.Metadata, true, nil
+	row := CheckpointRow{ID: x.ID, SessionID: x.SessionID, Archive: x.ArchivePath, Metadata: x.Metadata}
+	if x.TaskID != nil {
+		row.TaskID = *x.TaskID
+	}
+	return row, true, nil
 }
 func (s *Store) Checkpoint(ctx context.Context, id string) (CheckpointRow, error) {
 	x, err := s.client.Checkpoint.Get(ctx, id)

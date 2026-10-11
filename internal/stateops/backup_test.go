@@ -12,7 +12,7 @@ import (
 func TestBackupVerifyRestoreAndDrift(t *testing.T) {
 	ctx := context.Background()
 	root := t.TempDir()
-	home := filepath.Join(root, "state")
+	home := filepath.Join(root, "状 态\"源")
 	if err := os.MkdirAll(filepath.Join(home, "sessions", "ses_1"), 0o700); err != nil {
 		t.Fatal(err)
 	}
@@ -45,7 +45,7 @@ func TestBackupVerifyRestoreAndDrift(t *testing.T) {
 	if err := VerifyCurrent(ctx, home, backup); err != nil {
 		t.Fatal(err)
 	}
-	restored := filepath.Join(root, "restored")
+	restored := filepath.Join(root, "恢复\"state")
 	if err := Restore(ctx, backup, restored); err != nil {
 		t.Fatal(err)
 	}

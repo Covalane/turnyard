@@ -27,7 +27,8 @@ func artifactFixture(t *testing.T, connector bool) *fixture {
 		env.ArtifactConnectors = []contracts.ArtifactConnectorSpec{{ID: "object", URIPrefix: "mem://bucket/reports/",
 			GetArgv: []string{os.Args[0], "-test.run=^TestArtifactConnectorHelperProcess$", "--", "get", "{uri}", "{file}"},
 			PutArgv: []string{os.Args[0], "-test.run=^TestArtifactConnectorHelperProcess$", "--", "put", "{uri}", "{file}"},
-			PassEnv: []string{"TURNYARD_FAKE_BLOB_ROOT", "TURNYARD_FAKE_PUT_FAIL_AFTER_WRITE", "TURNYARD_FAKE_CONNECTOR"}}}
+			PutMode: contracts.ConnectorPutCreateOnly, NotFoundExitCodes: []int{44},
+			PassEnv: []string{"TURNYARD_FAKE_BLOB_ROOT", "TURNYARD_FAKE_PUT_FAIL_AFTER_WRITE", "TURNYARD_FAKE_READBACK_FAIL", "TURNYARD_FAKE_CONNECTOR"}}}
 	}
 	inputRoot := filepath.Join(root, "specs")
 	writeJSON(t, filepath.Join(inputRoot, "environment.json"), env)
@@ -120,6 +121,7 @@ func TestAttachmentAndLocalOutputWithoutRepository(t *testing.T) {
 func TestConnectorOutputReadbackAndRecoveryAfterLostAcknowledgement(t *testing.T) {
 	t.Setenv("TURNYARD_FAKE_CONNECTOR", "1")
 	t.Setenv("TURNYARD_FAKE_PUT_FAIL_AFTER_WRITE", "1")
+	t.Setenv("TURNYARD_FAKE_READBACK_FAIL", "1")
 	blobRoot := t.TempDir()
 	t.Setenv("TURNYARD_FAKE_BLOB_ROOT", blobRoot)
 	inputBytes := []byte("remote attachment")
@@ -149,13 +151,14 @@ func TestConnectorOutputReadbackAndRecoveryAfterLostAcknowledgement(t *testing.T
 	}
 	out, err := f.service.RunTask(context.Background(), added.TaskID, "", false, time.Minute)
 	if err != nil || out.Status != "failed" || out.Deliverables[0].Status != "unverified" {
-		t.Fatalf("lost upload acknowledgement should fail closed: %+v %v", out, err)
+		t.Fatalf("lost acknowledgement and failed readback should remain unverified: %+v %v", out, err)
 	}
 	uri := "mem://bucket/reports/" + hex.EncodeToString(sum[:]) + ".txt"
 	if out.Deliverables[0].URI != uri {
 		t.Fatalf("wrong delivery URI: %+v", out.Deliverables[0])
 	}
 	t.Setenv("TURNYARD_FAKE_PUT_FAIL_AFTER_WRITE", "")
+	t.Setenv("TURNYARD_FAKE_READBACK_FAIL", "")
 	rechecked, err := f.service.VerifyCandidate(context.Background(), added.TaskID)
 	if err != nil || rechecked.Status != "verified" || rechecked.Deliverables[0].URI != uri {
 		t.Fatalf("readback did not recover uploaded bytes: %+v %v", rechecked, err)
@@ -186,7 +189,13 @@ func TestArtifactConnectorHelperProcess(t *testing.T) {
 	}
 	remote := filepath.Join(os.Getenv("TURNYARD_FAKE_BLOB_ROOT"), strings.TrimPrefix(uri, "mem://bucket/reports/"))
 	if mode == "get" {
+		if _, err := os.Stat(filepath.Join(os.Getenv("TURNYARD_FAKE_BLOB_ROOT"), ".written")); err == nil && os.Getenv("TURNYARD_FAKE_READBACK_FAIL") == "1" {
+			os.Exit(1)
+		}
 		data, err := os.ReadFile(remote)
+		if os.IsNotExist(err) {
+			os.Exit(44)
+		}
 		if err != nil || os.WriteFile(file, data, 0o600) != nil {
 			os.Exit(1)
 		}
@@ -206,6 +215,9 @@ func TestArtifactConnectorHelperProcess(t *testing.T) {
 	_, err = io.Copy(to, from)
 	_ = from.Close()
 	_ = to.Close()
+	if os.WriteFile(filepath.Join(os.Getenv("TURNYARD_FAKE_BLOB_ROOT"), ".written"), nil, 0o600) != nil {
+		os.Exit(1)
+	}
 	if err != nil || os.Getenv("TURNYARD_FAKE_PUT_FAIL_AFTER_WRITE") == "1" {
 		os.Exit(1)
 	}

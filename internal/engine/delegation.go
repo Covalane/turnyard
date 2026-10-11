@@ -153,7 +153,7 @@ func (d *delegationServer) submit(ctx context.Context, key string, req delegatio
 	childAgent.Delegates = nil // A child cannot silently grow a new delegation tree.
 	childEnv := d.parent.env
 	childEnv.Agents = []contracts.AgentSpec{childAgent}
-	childEnv.ModelBindings = []contracts.ModelBinding{binding}
+	childEnv.ModelBindings = delegatedModelBindings(d.parent.env, binding)
 	childEnv.Git.RemoteWrites = contracts.GitRemoteWritesNone
 	childSpec := d.parent.session
 	childSpec.IdempotencyKey = key
@@ -215,6 +215,9 @@ func (d *delegationServer) submit(ctx context.Context, key string, req delegatio
 	if _, err := contracts.ValidateWorkSpec(work, childSpec, childEnv); err != nil {
 		return nil, err
 	}
+	if err := contracts.ValidateModelReferences(childEnv); err != nil {
+		return nil, err
+	}
 	if !found {
 		created, err = d.service.createSession(ctx, childSpec, childEnv, store.CreateSessionInput{
 			ParentSessionID: d.parent.task.SessionID, ParentTaskID: d.parent.task.ID,
@@ -234,6 +237,21 @@ func (d *delegationServer) submit(ctx context.Context, key string, req delegatio
 	observe.Log.InfoContext(ctx, "delegation submitted", "parent_task_id", d.parent.task.ID,
 		"child_session_id", created.SessionID, "child_task_id", added.TaskID, "agent_id", childAgent.ID)
 	return d.status(ctx, key)
+}
+
+// Keep only bindings consumed by the child runtime and its tool matcher.
+// Credential injection remains a separate capability decision in agents.
+func delegatedModelBindings(env contracts.EnvironmentSpec, primary contracts.ModelBinding) []contracts.ModelBinding {
+	bindings := []contracts.ModelBinding{primary}
+	if env.ToolSearch == nil || env.ToolSearch.Mode != contracts.ToolSearchLLMRerank || env.ToolSearch.ModelBinding == primary.ID {
+		return bindings
+	}
+	for _, binding := range env.ModelBindings {
+		if binding.ID == env.ToolSearch.ModelBinding {
+			return append(bindings, binding)
+		}
+	}
+	return bindings // Shared validation reports a missing matcher before creation.
 }
 
 func (d *delegationServer) validateScope(scope []contracts.ScopeRepo) error {

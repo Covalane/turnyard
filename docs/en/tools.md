@@ -19,10 +19,10 @@ At startup, the gateway connects to every backend granted to this agent and read
 The default matcher is local keyword search. Optionally, an OpenAI Chat-compatible model ranks **already granted tools** when keyword matches are weak or close. A model failure falls back to local search, unknown IDs from its response are discarded, and the model never executes a tool. Model ranking currently handles at most 64 granted tools; larger catalogs still use local search.
 
 ```json
-"tool_search": {"mode": "llm-rerank", "model_binding": "search-model"}
+{"tool_search": {"mode": "llm-rerank", "model_binding": "search-model"}}
 ```
 
-`search-model` must name a `model_bindings` entry with an OpenAI Chat endpoint. Omitting `tool_search` selects local search. `network: "none"` cannot use model ranking.
+Add this fragment to Environment. `search-model` must name a `model_bindings` entry with an OpenAI Chat endpoint. Omitting `tool_search` selects local search. `network: "none"` cannot use model ranking.
 
 ## Tool sources
 
@@ -37,7 +37,7 @@ The trusted environment pins an executable's `argv`, for example `['{toolDir}/st
 
 The Docker tool container mounts only tool configuration, bundles, and separate tool state; it cannot read the agent's native session state, and the agent cannot see the catalog lock. There is currently no per-tool outbound domain allowlist; deployments must enforce any needed destination policy at the network layer.
 
-Separate tool state and the catalog lock persist for the session but are not rolled back with an agent workspace checkpoint. After recovery, inspect the external result of any writing tool call before retrying it.
+Separate tool state and the catalog lock persist for the session and are excluded from agent workspace checkpoints. Restoring a checkpoint does not reset them. After recovery, inspect the external result of any writing tool call before retrying it.
 
 ### Verified executable example
 
@@ -59,7 +59,7 @@ Separate tool state and the catalog lock persist for the session but are not rol
 
 The supervisor environment first provides `TURNYARD_EXEC_WITNESS_MODE=enabled`. The agent calls `find_tools`, then `call_tool` with `{"tool_id":"stamp_cli/run","arguments":{"args":["alpha"]}}`. The bridge forwards the declared variable to the script, which returns `EXEC_WITNESS:alpha`; the agent writes it to the repository, and Turnyard independently checks the candidate. See [validation](validation.md) for real-model evidence. A complete Environment also needs sandbox and model bindings. Git policy is required only when the session includes repositories.
 
-To offer `ossutil` to the agent, install it in the image and configure `kind: "executable"`, `argv: ["ossutil"]`, a useful description, and any needed `pass_env`. The model supplies subcommands through `run.args`. For a **required final deliverable**, prefer the [supervisor artifact connector](lifecycle.md): Turnyard uploads only after checks pass, then downloads and verifies the bytes. A real OSS bucket upload and two independent readbacks passed; cleanup of the test object failed because the current account lacks delete permission. See [validation](validation.md).
+To offer `ossutil` to the agent, install it in the image and configure `kind: "executable"`, `argv: ["ossutil"]`, a useful description, and any needed `pass_env`. The model supplies subcommands through `run.args`. For a **required final deliverable**, prefer the [supervisor artifact connector](lifecycle.md): Turnyard uploads only after checks pass, then downloads and verifies the bytes. Historical acceptance passed a real OSS upload and two independent readbacks; cleanup failed because that account lacked delete permission. This does not validate the current atomic creation contract against real OSS. See [validation](validation.md).
 
 ## Skills, sandbox, and evidence
 

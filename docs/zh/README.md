@@ -62,7 +62,7 @@ bin/turnyard session complete <session-id>
 
 任务需要人工决定时会进入 `needs_input`，用 `task reply <task-id> --text "决定"` 继续原任务。检查失败后可用 `task verify <task-id>` 针对同一候选代码重跑检查，或用 `task retry <task-id>` 发起新代理调用。
 
-`task reconcile <task-id>` 为失败任务保存现有工作区检查点。对 `unknown` 任务，应先检查工作区、调用日志和外部工具副作用；该命令确认相关容器已经停止后，记录审计事件并将任务转为可重试的 `failed`。`checkpoint restore <checkpoint-id>` 要求工作区和代理状态目录都不存在，避免覆盖现有状态。
+`task reconcile <task-id>` 为失败任务保存现有工作区检查点。对 `unknown` 任务，应先检查工作区、调用日志和外部工具副作用；该命令确认相关容器已经停止后，记录审计事件并将任务转为可重试的 `failed`。`checkpoint restore <checkpoint-id>` 仅接受当前会话的最新检查点，并要求工作区和代理状态目录都不存在。旧检查点在解包前返回 `CHECKPOINT_NOT_CURRENT`，错误消息给出最新 ID。恢复用于中断后的续接；历史检查点保留作审计，不提供历史回滚。
 
 同一需求可依次追加任务；只有所有任务的候选版本均通过检查和交付物校验，才可执行 `session complete`。中途撤销需求时，可在没有活动调用的情况下用 `session cancel` 结束。终态不能再追加任务、调用代理、复验或恢复检查点。`session complete` 返回每个任务的候选摘要与交付物清单。详见[生命周期、交付与存储](lifecycle.md)。
 

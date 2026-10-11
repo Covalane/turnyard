@@ -66,10 +66,7 @@ func RunMain(ctx context.Context, input AgentInvocation, wire ModelWire, modelCr
 		environment = cloneEnvironment(environment)
 		environment["TURNYARD_DELEGATION_INVOCATION"] = input.InvocationID
 	}
-	var catalogDir string
-	if toolGateway == nil && (len(agent.Tools) > 0 || len(agent.Delegates) > 0) {
-		catalogDir = ToolCatalogDir(input.State)
-	}
+	catalogDir := LocalToolCatalogDir(input.Environment, input.State)
 	return input.Sandbox.Run(ctx, sandbox.SandboxRun{Name: "ty-" + input.InvocationID, Sandbox: input.Environment.Sandbox, Workspace: input.Workspace, Scope: input.Scope, State: input.State, CatalogDir: catalogDir, ArtifactDir: input.ArtifactDir, InputDir: input.InputDir, ControlDir: input.ControlDir, EntryPoint: entryPoint, Command: command, Environment: environment, Credentials: credentials, ModelGateway: gateway, ToolGateway: toolGateway, Timeout: input.Timeout, LogPath: input.LogPath})
 }
 

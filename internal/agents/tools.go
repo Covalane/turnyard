@@ -23,6 +23,15 @@ func ToolCatalogDir(state string) string {
 	return filepath.Join(filepath.Dir(state), "tool-catalog")
 }
 
+// Every local gateway needs the catalog lock, including the built-in input tool.
+// Sidecars mount their own catalog directory outside the agent container.
+func LocalToolCatalogDir(env contracts.EnvironmentSpec, state string) string {
+	if usesToolSidecar(env) {
+		return ""
+	}
+	return ToolCatalogDir(state)
+}
+
 // ToolLaunch is the runtime-independent launch description. Each driver only
 // translates it into its native local MCP configuration.
 type ToolLaunch struct {

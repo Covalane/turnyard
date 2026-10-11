@@ -48,34 +48,19 @@ func LoadSession(path string) (SessionSpec, EnvironmentSpec, error) {
 			!validConnectorCommand(connector.GetArgv) || len(connector.PutArgv) > 0 && !validConnectorCommand(connector.PutArgv) {
 			return session, env, fault.New(fault.CodeInvalidSpec, "artifact connector %s has invalid commands or URI prefix", connector.ID)
 		}
+		if err := ValidateConnectorDelivery(connector); err != nil {
+			return session, env, err
+		}
 	}
 	if err := uniqueIDs(ids, "artifact connector"); err != nil {
 		return session, env, err
 	}
 	ids = ids[:0]
-	models := collections.Set[string]{}
 	agents := collections.Set[string]{}
 	skills := collections.Set[string]{}
 	tools := collections.Set[string]{}
-	for _, m := range env.ModelBindings {
-		ids = append(ids, m.ID)
-		models.Add(m.ID)
-		for _, endpoint := range []string{m.Endpoints.OpenAIChat, m.Endpoints.Anthropic, m.Endpoints.Responses} {
-			if endpoint != "" && !ValidModelEndpoint(endpoint) {
-				return session, env, fault.New(fault.CodeInvalidSpec, "model binding %s has an invalid HTTPS endpoint", m.ID)
-			}
-		}
-	}
-	if err := uniqueIDs(ids, "model binding"); err != nil {
+	if err := ValidateModelReferences(env); err != nil {
 		return session, env, err
-	}
-	if search := env.ToolSearch; search != nil {
-		if search.Mode == ToolSearchLLMRerank && !models.Has(search.ModelBinding) {
-			return session, env, fault.New(fault.CodeInvalidSpec, "tool search references missing model binding")
-		}
-		if search.Mode == ToolSearchLexical && search.ModelBinding != "" {
-			return session, env, fault.New(fault.CodeInvalidSpec, "lexical tool search does not use a model binding")
-		}
 	}
 	ids = ids[:0]
 	for _, a := range env.Agents {
@@ -89,9 +74,6 @@ func LoadSession(path string) (SessionSpec, EnvironmentSpec, error) {
 		return session, env, fault.New(fault.CodeInvalidSpec, "primaryAgent does not exist")
 	}
 	for _, a := range env.Agents {
-		if !models.Has(a.ModelBinding) {
-			return session, env, fault.New(fault.CodeInvalidSpec, "agent %s references missing model", a.ID)
-		}
 		for _, child := range a.Delegates {
 			if child == a.ID || !agents.Has(child) {
 				return session, env, fault.New(fault.CodeInvalidSpec, "agent %s references invalid delegate %s", a.ID, child)
@@ -212,6 +194,58 @@ func LoadSession(path string) (SessionSpec, EnvironmentSpec, error) {
 		}
 	}
 	return session, env, nil
+}
+
+func ValidateConnectorDelivery(spec ArtifactConnectorSpec) error {
+	seen := collections.Set[int]{}
+	for _, code := range spec.NotFoundExitCodes {
+		if code < 1 || code > 255 || !seen.Add(code) {
+			return fault.New(fault.CodeInvalidSpec, "connector %s has invalid not-found exit codes", spec.ID)
+		}
+	}
+	if len(spec.PutArgv) > 0 && (spec.PutMode != ConnectorPutCreateOnly || len(spec.NotFoundExitCodes) == 0) {
+		return fault.New(fault.CodeInvalidSpec, "connector %s delivery requires create-only writes and explicit not-found exit codes", spec.ID)
+	}
+	if len(spec.PutArgv) == 0 && spec.PutMode != "" {
+		return fault.New(fault.CodeInvalidSpec, "connector %s declares a write mode without a write command", spec.ID)
+	}
+	return nil
+}
+
+// ValidateModelReferences also validates environments derived in memory, such
+// as managed child sessions, before they are persisted or used by a driver.
+func ValidateModelReferences(env EnvironmentSpec) error {
+	models := collections.Set[string]{}
+	for _, binding := range env.ModelBindings {
+		if !models.Add(binding.ID) {
+			return fault.New(fault.CodeInvalidSpec, "duplicate model binding %s", binding.ID)
+		}
+		for _, endpoint := range []string{binding.Endpoints.OpenAIChat, binding.Endpoints.Anthropic, binding.Endpoints.Responses} {
+			if endpoint != "" && !ValidModelEndpoint(endpoint) {
+				return fault.New(fault.CodeInvalidSpec, "model binding %s has an invalid HTTPS endpoint", binding.ID)
+			}
+		}
+	}
+	for _, agent := range env.Agents {
+		if !models.Has(agent.ModelBinding) {
+			return fault.New(fault.CodeInvalidSpec, "agent %s references missing model", agent.ID)
+		}
+	}
+	if search := env.ToolSearch; search != nil {
+		switch search.Mode {
+		case ToolSearchLLMRerank:
+			if !models.Has(search.ModelBinding) {
+				return fault.New(fault.CodeInvalidSpec, "tool search references missing model binding")
+			}
+		case ToolSearchLexical:
+			if search.ModelBinding != "" {
+				return fault.New(fault.CodeInvalidSpec, "lexical tool search does not use a model binding")
+			}
+		default:
+			return fault.New(fault.CodeInvalidSpec, "unknown tool search mode %s", search.Mode)
+		}
+	}
+	return nil
 }
 
 func validConnectorCommand(argv []string) bool {

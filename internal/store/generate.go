@@ -1,3 +1,3 @@
 package store
 
-//go:generate go run -mod=mod entgo.io/ent/cmd/ent generate --target ./ent ./ent/schema
+//go:generate go tool ent generate --target ./ent ./ent/schema

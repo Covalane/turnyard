@@ -6,6 +6,8 @@ This page summarizes verified behavior, failures, and reproduction steps. Live m
 
 Historical runs took place on September 26–29, 2026, across macOS Apple Silicon, Linux/arm64 inside Docker Desktop, Apple `container`, and Podman. Results came from different source and image revisions; they do not add up to one release acceptance run. Raw invocation logs, temporary databases, and model outputs remain in an ignored state directory on the execution machine. **They are not published with this repository, so the historical runs cannot be independently audited from this page alone.**
 
+The October 11 F1–F7 repairs and current Go, image, and Docker checks are recorded separately in the [review's repair section](../zh/reviews/2026-10-11-full-review.md#修复与复验2026-10-11), with an English summary. That round passed CLI startup, built-in human input, and Docker boundary probes on the new image; it did not repeat the historical cloud-model or external-service acceptance below.
+
 ## Verified paths
 
 | Path | Historical result and limit |
@@ -37,10 +39,15 @@ Base checks need no cloud model:
 go generate ./internal/store
 go test -race ./...
 go vet ./...
-go test -tags integration -run '^$' ./test/...
+go tool staticcheck ./...
+go tool govulncheck ./...
+go vet -tags integration ./...
+go test -tags integration -run '^$' ./...
 ```
 
 The last command checks compilation with the `integration` tag only; **it is not a live agent, OCI, or OSS acceptance run**.
+
+Ent, Staticcheck, and Govulncheck are pinned by `tool` directives in `go.mod`, so generation and CI share the same dependencies. The current `golang.org/x/tools` 0.52.0 pin supports Go 1.27.2's export format. Staticcheck 0.8.1 is incompatible, so the current pin uses upstream commit `452d5bb86b45`, not a floating `@master`. Replace it with a stable release containing the compatibility fixes and rerun the checks when one becomes available.
 
 Live tests are opt-in. Set `TURNYARD_E2E_PROVIDER` and `TURNYARD_E2E_MODEL`, and set `TURNYARD_E2E_CREDENTIAL_ENV` to the name of an existing credential variable before running, for example:
 
@@ -51,3 +58,5 @@ TURNYARD_DELEGATION_RECOVERY_E2E=1 TURNYARD_E2E_BACKEND=docker go test -tags int
 ```
 
 Use `TURNYARD_E2E_RUNTIME`, `TURNYARD_E2E_BACKEND`, and `TURNYARD_E2E_IMAGE` to select a path. Recovery tests also require `TURNYARD_DELEGATION_CHILD_PROVIDER`, `TURNYARD_DELEGATION_CHILD_MODEL`, and `TURNYARD_DELEGATION_CHILD_CREDENTIAL_ENV`. Chatroom tests need `TURNYARD_CHAT_PROVIDER`, `TURNYARD_CHAT_MODEL`, and `TURNYARD_CHAT_CREDENTIAL_ENV`; model ranking needs `TURNYARD_MATCHER_ENDPOINT`, `TURNYARD_MATCHER_MODEL`, and `TURNYARD_MATCHER_CREDENTIAL_ENV`; PR readback needs `TURNYARD_GITHUB_PR_URL` and `TURNYARD_GITHUB_REPOSITORY_URL`. Prepare the sandbox image and required permissions first. Keep failed runs distinct from skipped tests and successful validation.
+
+The OSS test also requires `TURNYARD_OSS_E2E_PREFIX`, `TURNYARD_OSS_E2E_REGION`, and the absolute `TURNYARD_OSS_E2E_CONNECTOR` path. The trusted adapter implements `get <uri> <file>` (exit 44 only for confirmed absence) and `create <uri> <file>` (atomic service-side refusal to overwrite). A CLI's generic failure code must not be treated as absence. Independent readback and cleanup still use the configured host `aliyun` CLI.

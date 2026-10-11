@@ -21,6 +21,8 @@ func TestSchemaEnumsMatchNamedValues(t *testing.T) {
 			[]string{string(SandboxNetworkDefault), string(SandboxNetworkNone), string(SandboxNetworkModelOnly)}},
 		{"tool search mode", "environment", []string{"properties", "tool_search", "properties", "mode", "enum"},
 			[]string{string(ToolSearchLexical), string(ToolSearchLLMRerank)}},
+		{"connector write mode", "environment", []string{"properties", "artifact_connectors", "items", "properties", "put_mode", "enum"},
+			[]string{string(ConnectorPutCreateOnly)}},
 		{"remote Git writes", "environment", []string{"properties", "git", "properties", "remote_writes", "enum"},
 			[]string{string(GitRemoteWritesNone), string(GitRemoteWritesPush)}},
 		{"repository scope", "work", []string{"properties", "scope", "properties", "repositories", "items", "properties", "mode", "enum"},

@@ -21,7 +21,7 @@ Turnyard 是一个可独立使用的编码代理任务执行器。你用 JSON �
 
 ## 快速开始
 
-下面以 Docker、OpenCode 和 Ollama Cloud 处理一个**已有且工作区干净的 Go Git 仓库**为例。需要 Go 1.27.1、Docker、Git 和相应的模型 API key。先在 Turnyard 仓库根目录构建程序与代理镜像：
+下面以 Docker、OpenCode 和 Ollama Cloud 处理一个**已有且工作区干净的 Go Git 仓库**为例。需要 Go 1.27.2、Docker、Git 和相应的模型 API key。先在 Turnyard 仓库根目录构建程序与代理镜像：
 
 ```sh
 go build -o bin/turnyard ./cmd/turnyard
@@ -86,4 +86,4 @@ bin/turnyard session complete "$SESSION_ID"
 
 ## 开发与许可证
 
-修改 Go 代码后运行 `go test -race ./...`、`go vet ./...`；修改 Ent schema 后运行 `go generate ./internal/store` 并检查生成差异。真实代理和 OCI 验收需要另行配置，范围见[验证记录](docs/zh/validation.md)。Turnyard 使用 [Apache License 2.0](LICENSE)。
+开发门禁包括 `go test -race ./...`、`go vet ./...`、`go tool staticcheck ./...` 和 `go tool govulncheck ./...`。修改 Ent schema 后运行 `go generate ./internal/store` 并检查生成差异；工具版本统一固定在 `go.mod`。真实代理和 OCI 验收需要另行配置，复现命令与验证范围见[验证记录](docs/zh/validation.md)。Turnyard 使用 [Apache License 2.0](LICENSE)。

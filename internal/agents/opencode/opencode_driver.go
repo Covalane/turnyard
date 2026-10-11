@@ -111,10 +111,7 @@ func (Driver) Invoke(ctx context.Context, input agents.AgentInvocation) (agents.
 		if err != nil {
 			return output, err
 		}
-		var catalogDir string
-		if gateway == nil {
-			catalogDir = agents.ToolCatalogDir(input.State)
-		}
+		catalogDir := agents.LocalToolCatalogDir(input.Environment, input.State)
 		inventory, err := input.Sandbox.Run(ctx, sandbox.SandboxRun{Name: "ty-tools-" + input.InvocationID, Sandbox: input.Environment.Sandbox, Workspace: input.Workspace, Scope: readScope, State: input.State, CatalogDir: catalogDir, ControlDir: input.ControlDir, Command: []string{"mcp", "list"}, Credentials: toolCredentials, ToolGateway: gateway, Timeout: 90 * time.Second, LogPath: input.LogPath + ".tools.txt"})
 		if err != nil {
 			return output, err

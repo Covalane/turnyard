@@ -2,6 +2,7 @@ package artifacts
 
 import (
 	"context"
+	"errors"
 	"os"
 	"path/filepath"
 	"strings"
@@ -42,10 +43,14 @@ func DeliverConnector(ctx context.Context, env contracts.EnvironmentSpec, spec c
 	defer os.Remove(readback)
 	if err := connector.Get(ctx, uri, readback, maxOutputBytes); err == nil {
 		return compareReadback(ctx, result, readback)
+	} else if !errors.Is(err, artifactio.ErrNotFound) {
+		observe.LogFailure(ctx, "deliverable destination read unconfirmed", err, "deliverable_id", spec.ID)
+		return unverified(result)
 	}
 	if err := connector.Put(ctx, result.LocalPath, uri); err != nil {
 		observe.LogFailure(ctx, "deliverable upload unconfirmed", fault.Ensure(err, "upload deliverable"), "deliverable_id", spec.ID, "connector", spec.Destination.Connector)
-		return unverified(result)
+		// A competing create or lost acknowledgement can still be resolved by
+		// readback. The create-only command cannot overwrite the winning object.
 	}
 	if err := connector.Get(ctx, uri, readback, maxOutputBytes); err != nil {
 		observe.LogFailure(ctx, "deliverable readback failed", fault.Ensure(err, "read back deliverable"), "deliverable_id", spec.ID, "connector", spec.Destination.Connector)

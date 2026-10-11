@@ -8,6 +8,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"slices"
 	"strings"
 	"time"
 
@@ -18,6 +19,11 @@ import (
 type Connector struct {
 	Spec contracts.ArtifactConnectorSpec
 }
+
+// ErrNotFound is returned only for the command's explicitly configured missing
+// object exit codes. Transport, authorization and timeout failures retain their
+// original cause and must never authorize a write.
+var ErrNotFound = errors.New("artifact object not found")
 
 func Find(env contracts.EnvironmentSpec, id string) (Connector, error) {
 	for _, spec := range env.ArtifactConnectors {
@@ -77,6 +83,9 @@ func (c Connector) Put(ctx context.Context, source, uri string) error {
 	if !c.validURI(uri) || len(c.Spec.PutArgv) == 0 {
 		return fault.New(fault.CodeInvalidSpec, "connector cannot publish to this URI")
 	}
+	if err := contracts.ValidateConnectorDelivery(c.Spec); err != nil {
+		return err
+	}
 	info, err := os.Lstat(source)
 	if err != nil {
 		return fault.Wrap(fault.CodeDeliverableInvalid, "stat connector source", err, "published source cannot be inspected")
@@ -88,6 +97,9 @@ func (c Connector) Put(ctx context.Context, source, uri string) error {
 }
 
 func (c Connector) run(ctx context.Context, argv []string, uri, file string, maxBytes int64) error {
+	if len(argv) == 0 || argv[0] == "" {
+		return fault.New(fault.CodeInvalidSpec, "connector command is missing")
+	}
 	timeout := c.Spec.TimeoutSeconds
 	if timeout == 0 {
 		timeout = 300
@@ -108,7 +120,9 @@ func (c Connector) run(ctx context.Context, argv []string, uri, file string, max
 	if maxBytes > 0 {
 		exceeded := make(chan struct{}, 1)
 		stopped := make(chan struct{})
+		done := make(chan struct{})
 		go func() {
+			defer close(done)
 			ticker := time.NewTicker(10 * time.Millisecond)
 			defer ticker.Stop()
 			for {
@@ -127,25 +141,28 @@ func (c Connector) run(ctx context.Context, argv []string, uri, file string, max
 		}()
 		err := cmd.Run()
 		close(stopped)
+		<-done
 		select {
 		case <-exceeded:
 			return fault.New(fault.CodeDeliverableUnverified, "%s download exceeds size limit", c.Spec.ID)
 		default:
 		}
-		if err != nil {
-			return fault.Wrap(fault.CodeDeliverableUnverified, "artifact connector", err, "%s operation failed", c.Spec.ID)
-		}
-		if err := runCtx.Err(); err != nil {
-			return fault.Wrap(fault.CodeDeliverableUnverified, "artifact connector", err, "%s operation timed out", c.Spec.ID)
-		}
-		return nil
+		return c.operationError(runCtx, err, true)
 	}
 	// CLI stderr may contain signed URLs or credentials, so never persist it.
-	if err := cmd.Run(); err != nil {
-		return fault.Wrap(fault.CodeDeliverableUnverified, "artifact connector", err, "%s operation failed", c.Spec.ID)
+	return c.operationError(runCtx, cmd.Run(), false)
+}
+
+func (c Connector) operationError(ctx context.Context, err error, read bool) error {
+	if cause := ctx.Err(); cause != nil {
+		return fault.Wrap(fault.CodeDeliverableUnverified, "artifact connector", cause, "%s operation interrupted", c.Spec.ID)
 	}
-	if err := runCtx.Err(); err != nil {
-		return fault.Wrap(fault.CodeDeliverableUnverified, "artifact connector", err, "%s operation timed out", c.Spec.ID)
+	if err == nil {
+		return nil
 	}
-	return nil
+	var exit *exec.ExitError
+	if read && errors.As(err, &exit) && slices.Contains(c.Spec.NotFoundExitCodes, exit.ExitCode()) {
+		return fault.Wrap(fault.CodeNotFound, "artifact connector", errors.Join(ErrNotFound, err), "%s object is absent", c.Spec.ID)
+	}
+	return fault.Wrap(fault.CodeDeliverableUnverified, "artifact connector", err, "%s operation failed", c.Spec.ID)
 }

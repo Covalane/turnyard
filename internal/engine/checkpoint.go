@@ -76,6 +76,18 @@ func (s *Service) Restore(ctx context.Context, id string) (RestoreResult, error)
 	if err != nil {
 		return RestoreResult{}, err
 	}
+	release, err := s.reserveSession(checkpoint.SessionID)
+	if err != nil {
+		return RestoreResult{}, err
+	}
+	defer release()
+	latest, found, err := s.Store.LatestCheckpoint(ctx, checkpoint.SessionID)
+	if err != nil {
+		return RestoreResult{}, err
+	}
+	if !found || latest.ID != id {
+		return RestoreResult{}, fault.New(fault.CodeCheckpointNotCurrent, "only the latest checkpoint can be restored; current checkpoint is %s", latest.ID)
+	}
 	row, err := s.Store.Session(ctx, checkpoint.SessionID)
 	if err != nil {
 		return RestoreResult{}, err

@@ -29,6 +29,7 @@ const (
 	CodeCapacityWaitTimeout    Code = "CAPACITY_WAIT_TIMEOUT"
 	CodeCapabilityMissing      Code = "CAPABILITY_MISSING"
 	CodeCheckpointCorrupt      Code = "CHECKPOINT_CORRUPT"
+	CodeCheckpointNotCurrent   Code = "CHECKPOINT_NOT_CURRENT"
 	CodeConcurrentRun          Code = "CONCURRENT_RUN"
 	CodeDaemonFailed           Code = "DAEMON_FAILED"
 	CodeDaemonUnavailable      Code = "DAEMON_UNAVAILABLE"

@@ -204,7 +204,7 @@ func (catalog connectorCatalog) canRead(id, uri string) bool {
 
 func (catalog connectorCatalog) canWrite(id, uri string) bool {
 	connector, exists := catalog[id]
-	if !exists || len(connector.PutArgv) == 0 || strings.Count(uri, "{sha256}") != 1 {
+	if !exists || len(connector.PutArgv) == 0 || ValidateConnectorDelivery(connector) != nil || strings.Count(uri, "{sha256}") != 1 {
 		return false
 	}
 	return ValidConnectorURI(connector, strings.Replace(uri, "{sha256}", strings.Repeat("0", 64), 1))

@@ -33,9 +33,11 @@ bin/turnyard state verify --from /secure/backups/turnyard-2026-09-26
 bin/turnyard session prune <已完成或取消的会话ID> --backup /secure/backups/turnyard-2026-09-26
 ```
 
-备份是权限受限的目录，包含 SQLite 数据库、工作区、代理状态、日志和检查点；清单记录每个文件的 SHA-256。备份目录必须在状态目录之外。清理前会重新验证备份，并要求当前状态与备份完全一致；清理后删除该会话的数据库记录及文件。每次清理下一个会话前需要重新备份。可用 `state restore --from <备份目录> --to <不存在的目录>` 恢复完整状态；恢复到新目录时会更新数据库中指向状态目录的路径。备份可能包含源代码、任务正文及代理状态，应按敏感数据保管。
+备份是权限受限的目录，包含 SQLite 数据库、工作区、代理状态、日志和检查点；清单记录每个文件的 SHA-256。备份目录必须在状态目录之外。清理前会重新验证备份，并要求当前状态与备份完全一致；清理后删除该会话的数据库记录及文件。每次清理下一个会话前需要重新备份。可用 `state restore --from <备份目录> --to <不存在的目录>` 恢复完整状态；恢复到新目录时会按路径边界重定位工作区、检查点、调用日志及结果中的 `log_path`、`local_path`；任务正文、源仓库路径和 URL 保留原值。重定位在事务内解析并重新编码 JSON，遇到损坏记录会取消安装恢复目录。备份可能包含源代码、任务正文及代理状态，应按敏感数据保管。
 
 ## 输入附件与交付物
+
+### 输入附件
 
 `Work.inputs` 可携带图片、文档或其他文件的**实际字节**，不是只把链接放进提示词。每项声明 `id`、`source`、可选 `media_type` 和 `expected_sha256`。`source.kind` 支持：
 
@@ -47,7 +49,9 @@ bin/turnyard session prune <已完成或取消的会话ID> --backup /secure/back
 
 Turnyard 在 `task add` 时复制并校验附件，保存为会话内的只读快照；后续源文件或 URL 变化不影响任务。原始 URL、签名查询参数和本机源路径不写入任务记录。单个附件目前上限为 256 MiB；接收、排队和入库合计默认允许 20 分钟，可用 `task add --timeout <秒>` 调整。代理在 `/workspace/.turnyard-input/<快照目录>/<id>` 读取文件；这保证容器内能访问字节，图片能否被模型当作视觉输入仍取决于所选运行时和模型。
 
-`Work.deliverables` 声明必需产出，文件、图片、文本和 PR 共享 `id`、`kind`、`status`、`verification` 等结果字段：
+### 声明与验证交付物
+
+`Work.deliverables` 声明必需产出。文件、图片、文本和 PR 共享 `id`、`kind`、`status`、`verification` 等结果字段。
 
 每个任务至少要声明一项可信检查或一项交付物；二者都为空的任务不能被标记为已验证。
 
@@ -58,7 +62,7 @@ Turnyard 在 `task add` 时复制并校验附件，保存为会话内的只读�
 | `text` | 本次调用的 `artifacts.json` 声明 | 非空 UTF-8、64 KiB 限额和 SHA-256；不证明文字结论正确 |
 | `pull_request` | 本次调用的 URL 声明 | 托管平台读回仓库、状态、目标分支和候选 commit |
 
-文件或图片的 `destination` 可为 `{"kind":"local"}` 或 `{"kind":"connector","connector":"oss","uri":"oss://bucket/reports/{sha256}.pdf"}`。仓库文件省略 `destination` 时仍留在 Git commit；无仓库文件必须明确给出目的地。`local` 返回会话状态目录中的 `local_path`；`connector` 在检查通过后上传到内容寻址 URI，再下载并核对 SHA-256，结果包含 `uri`。外部上传失败或读回不确定时任务不会通过；`task verify` 可对同一候选重试读回。连接器上传命令应采用“已存在则跳过”的语义，避免覆盖不同内容。
+文件或图片的 `destination` 可为 `{"kind":"local"}` 或 `{"kind":"connector","connector":"oss","uri":"oss://bucket/reports/{sha256}.pdf"}`。仓库文件省略 `destination` 时仍留在 Git commit；无仓库文件必须明确给出目的地。`local` 返回会话状态目录中的 `local_path`。连接器交付在可信检查通过后进行，结果包含内容寻址的 `uri` 和经读回核对的 SHA-256。
 
 可信检查运行时，封存的文件按产物 `id` 只读挂载在 `/workspace/.turnyard-output/<id>`，因此可以在外部交付前核查 PDF、图片或其他文档内容。通用 `file.media_type` 是任务声明的元数据；系统目前只对 `image` 的上述格式检查文件头。
 
@@ -72,17 +76,38 @@ Turnyard 在 `task add` 时复制并校验附件，保存为会话内的只读�
 }
 ```
 
-环境配置连接器的命令与 URI 边界，任务无法覆盖命令：
+### 配置交付连接器
+
+环境配置连接器的命令与 URI 边界，任务无法覆盖命令。写入连接器必须声明 `put_mode: "create-only"`，并由命令在存储服务端原子拒绝已存在对象。交付遵循以下规则：
+
+| 读取结果 | Turnyard 的处理 |
+| --- | --- |
+| 对象存在，摘要一致 | 返回 `present`，不重复上传 |
+| 对象存在，摘要不同 | 返回 `mismatch`，保留既有对象 |
+| 命令以 `not_found_exit_codes` 明确报告缺失 | 尝试原子创建，然后下载核对摘要 |
+| 权限、超时或其他读取错误 | 返回 `unverified`，不尝试上传 |
+
+上传回执丢失或发生竞争创建时，也以读回的实际字节判断结果。无法读回的产物仍为 `unverified`，任务不能通过；可用 `task verify` 对同一候选重新检查和交付。
+
+下面是连接器配置片段：
 
 ```json
 {
   "artifact_connectors": [{"id": "oss", "uri_prefix": "oss://my-bucket/turnyard/",
-    "get_argv": ["ossutil", "cp", "{uri}", "{file}", "-f"],
-    "put_argv": ["ossutil", "cp", "{file}", "{uri}", "--ignore-existing"]}]
+    "get_argv": ["/opt/connectors/object-transfer", "get", "{uri}", "{file}"],
+    "not_found_exit_codes": [44],
+    "put_argv": ["/opt/connectors/object-transfer", "create", "{uri}", "{file}"],
+    "put_mode": "create-only"}]
 }
 ```
 
+上述 `object-transfer` 是部署者提供的可信适配程序示例名称，需自行安装。它的 `get` 仅在确认对象不存在时退出 44，其他错误使用不同退出码；`create` 必须使用服务端条件写入，不能靠先查询再上传实现“不覆盖”。Turnyard 校验声明并依据退出码处理，原子写入能力由可信命令和存储服务实现。直接配置 `ossutil cp --ignore-existing` 不满足这一原子性要求。OSS 适配可使用服务端 `x-oss-forbid-overwrite`，并需核对桶版本控制等条件是否使该保证失效，见 [OSS PutObject 文档](https://www.alibabacloud.com/help/en/oss/developer-reference/put-object)。
+
 上述片段放入完整的 Environment JSON。连接器在 supervisor 宿主机执行，使用它自己的 OSS 配置；代理无需得到存储凭据。也可以用同一接口配置其他 CLI，但命令须由可信的环境管理员提供，能将一个 URI 与一个文件相互复制。`get_argv`、`put_argv` 分别只能使用一次 `{uri}` 和 `{file}`。`input_hosts` 仅约束 Turnyard 对 HTTPS 附件的下载；当前容器的默认网络仍可访问外网，不能把提示词或未注入某个工具当作完整的网络访问控制。
+
+**配置更新：** 旧写入配置需要补上 `put_mode`、`not_found_exit_codes`，并使用真正支持原子创建的命令；只添加字段不能改变命令的写入行为。会话创建时已保存环境，修改源 Environment JSON 不会更新已有会话。将修正配置用于新的会话；当前没有原地更新已有会话环境的命令。
+
+### 取得产出记录
 
 文本和 PR URL 由代理写入本次调用专属的 `/workspace/.turnyard-output/artifacts.json`，例如：
 

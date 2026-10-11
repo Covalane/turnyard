@@ -12,6 +12,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/Covalane/turnyard/internal/agents"
 	"github.com/Covalane/turnyard/internal/contracts"
 	"github.com/Covalane/turnyard/internal/fault"
 	"github.com/Covalane/turnyard/internal/lifecycle"
@@ -138,9 +139,12 @@ func TestManagedDelegationCreatesIsolatedVerifiedChildAndHandoff(t *testing.T) {
 		Sandbox: SandboxSpec{Backend: "docker", Image: "test:latest"},
 		Agents: []AgentSpec{{ID: "lead", Runtime: "opencode", ModelBinding: "model", Delegates: []string{"helper"}},
 			{ID: "helper", Runtime: "kimi", ModelBinding: "model"}},
-		ModelBindings: []ModelBinding{{ID: "model", Provider: "ollama-cloud", Model: "test", CredentialEnv: "MODEL_API_KEY"}},
-		Git:           GitPolicy{LocalCommits: true, RemoteWrites: "none"},
-		Checks:        []CheckSpec{{ID: "build", Argv: []string{"go", "version"}, Repositories: []string{"api"}}}}
+		ModelBindings: []ModelBinding{{ID: "model", Provider: "ollama-cloud", Model: "test", CredentialEnv: "MODEL_API_KEY"},
+			{ID: "reranker", Provider: "ollama-cloud", Model: "search", CredentialEnv: "SEARCH_API_KEY"},
+			{ID: "unused", Provider: "ollama-cloud", Model: "other", CredentialEnv: "UNUSED_API_KEY"}},
+		ToolSearch: &contracts.ToolSearchSpec{Mode: contracts.ToolSearchLLMRerank, ModelBinding: "reranker"},
+		Git:        GitPolicy{LocalCommits: true, RemoteWrites: "none"},
+		Checks:     []CheckSpec{{ID: "build", Argv: []string{"go", "version"}, Repositories: []string{"api"}}}}
 	writeJSON(t, filepath.Join(inputs, "environment.json"), env)
 	writeJSON(t, filepath.Join(inputs, "session.json"), session)
 	service, err := NewService(ctx, filepath.Join(root, "state"))
@@ -153,6 +157,16 @@ func TestManagedDelegationCreatesIsolatedVerifiedChildAndHandoff(t *testing.T) {
 	service.DriverFactory = func(runtime string) (AgentDriver, error) {
 		return &testDriver{runtime: runtime, run: func(input AgentInvocation) (AgentResult, error) {
 			if input.AgentID == "helper" {
+				if len(input.Environment.ModelBindings) != 2 {
+					return AgentResult{}, fault.New(fault.CodeInvalidSpec, "child bindings do not match dependency closure")
+				}
+				selected, _, err := agents.SelectAgent(input.Environment, input.AgentID)
+				if err != nil {
+					return AgentResult{}, err
+				}
+				if _, err := agents.PrepareTools(selected, input.Environment, input.State); err != nil {
+					return AgentResult{}, err
+				}
 				if err := os.WriteFile(filepath.Join(input.Workspace, "api", "child.txt"), []byte("verified child output\n"), 0o600); err != nil {
 					return AgentResult{}, err
 				}

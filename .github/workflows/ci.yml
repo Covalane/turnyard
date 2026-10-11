@@ -27,12 +27,12 @@ jobs:
       - name: Vet
         run: go vet ./...
       - name: Staticcheck
-        run: go run honnef.co/go/tools/cmd/staticcheck@v0.8.1 ./...
+        run: go tool staticcheck ./...
       - name: Vulnerability check
-        run: go run golang.org/x/vuln/cmd/govulncheck@v1.8.0 ./...
+        run: go tool govulncheck ./...
       - name: Integration build and static checks
         run: |
-          go test -tags integration -run '^$' ./test/...
+          go test -tags integration -run '^$' ./...
           go vet -tags integration ./...
 
   docker-boundary:
@@ -45,6 +45,8 @@ jobs:
           cache: true
       - name: Build pinned agent image
         run: docker build -f Containerfile -t turnyard-agent:ci .
+      - name: Agent CLI startup
+        run: docker run --rm --network none --entrypoint /bin/sh turnyard-agent:ci -ec 'go version; opencode --version; kimi --version; claude --version; codex --version'
       - name: Real Docker sandbox and gateway boundaries
         env:
           TURNYARD_INTEGRATION_BACKEND: docker
@@ -54,3 +56,4 @@ jobs:
         run: |
           go test -count=1 -run '^TestRealSandboxFaults$' ./internal/sandbox
           go test -tags integration -count=1 -run '^Test(ModelOnlyDockerBoundary|ModelGatewayCannotBeUsedFromBridge|ToolGatewayKeepsCredentialOutsideAgent)$' ./internal/sandbox
+          go test -tags integration -count=1 -run '^TestBuiltinInputLocalGateway$' ./internal/agents

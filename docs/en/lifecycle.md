@@ -33,9 +33,11 @@ bin/turnyard state verify --from /secure/backups/turnyard-2026-09-26
 bin/turnyard session prune <completed-or-cancelled-session-id> --backup /secure/backups/turnyard-2026-09-26
 ```
 
-The restricted backup directory contains SQLite, workspaces, native agent state, logs, and checkpoints. Its manifest records each file's SHA-256. The backup must be outside the state directory. Pruning rechecks the backup and requires the live state to match it exactly before removing the terminal session's database records and files. Make a new backup before pruning another session. `state restore --from <backup> --to <new-directory>` restores the complete state and relocates stored state paths. Backups can contain source code, task text, and native agent state; handle them as sensitive data.
+The restricted backup directory contains SQLite, workspaces, native agent state, logs, and checkpoints. Its manifest records each file's SHA-256. The backup must be outside the state directory. Pruning rechecks the backup and requires the live state to match it exactly before removing the terminal session's database records and files. Make a new backup before pruning another session. `state restore --from <backup> --to <new-directory>` restores complete state and relocates workspace, checkpoint and invocation paths, plus `log_path` and `local_path` in results. Task text, source repositories and URLs remain unchanged. JSON is decoded and re-encoded in the relocation transaction; corrupt records abort installation of the restored directory. Backups can contain source code, task text, and native agent state; handle them as sensitive data.
 
 ## Task attachments and deliverables
+
+### Input attachments
 
 `Work.inputs` provides actual image, document, or other file bytes. Each input has an `id`, a `source`, optional `media_type`, and optional `expected_sha256`:
 
@@ -47,7 +49,9 @@ The restricted backup directory contains SQLite, workspaces, native agent state,
 
 At `task add`, Turnyard copies and verifies the bytes into a read-only session snapshot. Later changes to the original source cannot change the task. Original URLs, signed query strings, and local source paths are not stored in the task record. An input is currently limited to 256 MiB. Intake, queueing, and persistence share a 20-minute default deadline, adjustable with `task add --timeout <seconds>`. The agent sees `/workspace/.turnyard-input/<snapshot>/<id>`; whether an image is interpreted visually depends on the selected runtime and model.
 
-`Work.deliverables` declares required results. Every task must declare at least one trusted check or one deliverable; a task with neither cannot become verified:
+### Declare and verify deliverables
+
+`Work.deliverables` declares required results. Files, images, text, and PRs share result fields such as `id`, `kind`, `status`, and `verification`. Every task must declare at least one trusted check or one deliverable; a task with neither cannot become verified.
 
 | Kind | Location | Verification |
 | --- | --- | --- |
@@ -56,7 +60,7 @@ At `task add`, Turnyard copies and verifies the bytes into a read-only session s
 | `text` | Invocation claim in `artifacts.json` | Nonempty UTF-8, 64 KiB limit, SHA-256; does not prove the statement is true |
 | `pull_request` | URL claim | Provider readback of repository, state, base branch, and candidate commit |
 
-A file or image `destination` may be `{"kind":"local"}` or `{"kind":"connector","connector":"oss","uri":"oss://bucket/reports/{sha256}.pdf"}`. A repository file with no destination remains in its Git commit; a non-repository file must declare a destination. `local` returns `local_path` in the session state directory. A connector uploads to a content-addressed URI only after checks pass, then downloads and compares SHA-256; its result contains `uri`. An uncertain upload or failed readback cannot pass. `task verify` can retry readback on the same candidate. Configure uploads to skip existing objects so conflicting bytes cannot be overwritten.
+A file or image `destination` may be `{"kind":"local"}` or `{"kind":"connector","connector":"oss","uri":"oss://bucket/reports/{sha256}.pdf"}`. A repository file with no destination remains in its Git commit; a non-repository file must declare a destination. `local` returns `local_path` in the session state directory. Connector delivery happens after trusted checks pass; the result contains a content-addressed `uri` and a SHA-256 confirmed by readback.
 
 Trusted checks receive sealed files by output `id` as read-only `/workspace/.turnyard-output/<id>`. They can check document content before external delivery. For a general `file`, `media_type` is declared metadata; the built-in signature check applies only to the image formats listed above.
 
@@ -70,17 +74,38 @@ A document-only task can use empty `Session.repositories` and `Work.scope.reposi
 }
 ```
 
-The trusted Environment configures the connector commands and URI boundary; Work cannot supply commands:
+### Configure a delivery connector
+
+The trusted Environment configures the connector commands and URI boundary; Work cannot supply commands. A writable connector must declare `put_mode: "create-only"` and use a command that atomically refuses existing objects at the storage service. Delivery follows these rules:
+
+| Read result | Turnyard's action |
+| --- | --- |
+| Object exists with the expected digest | Return `present`; skip upload |
+| Object exists with a different digest | Return `mismatch`; preserve the object |
+| Command explicitly reports absence through `not_found_exit_codes` | Attempt atomic creation, then download and compare the digest |
+| Authorization, timeout, or other read error | Return `unverified`; do not upload |
+
+Lost upload acknowledgements and competing creates are also resolved by reading the actual bytes. If readback fails, the deliverable remains `unverified` and the task cannot pass. Use `task verify` to repeat checks and delivery for the same candidate.
+
+Example connector configuration fragment:
 
 ```json
 {
   "artifact_connectors": [{"id": "oss", "uri_prefix": "oss://my-bucket/turnyard/",
-    "get_argv": ["ossutil", "cp", "{uri}", "{file}", "-f"],
-    "put_argv": ["ossutil", "cp", "{file}", "{uri}", "--ignore-existing"]}]
+    "get_argv": ["/opt/connectors/object-transfer", "get", "{uri}", "{file}"],
+    "not_found_exit_codes": [44],
+    "put_argv": ["/opt/connectors/object-transfer", "create", "{uri}", "{file}"],
+    "put_mode": "create-only"}]
 }
 ```
 
+`object-transfer` is an illustrative trusted adapter supplied and installed by the operator. Its `get` exits 44 only for a confirmed missing object, and uses different codes for other errors. Its `create` must use a service-side conditional write; an existence check followed by a normal upload is insufficient. Turnyard validates the declaration and exit status; the trusted command and storage service provide atomic creation. Plain `ossutil cp --ignore-existing` does not meet this contract. An OSS adapter may use `x-oss-forbid-overwrite`, after checking bucket versioning and other conditions that affect this guarantee; see [OSS PutObject](https://www.alibabacloud.com/help/en/oss/developer-reference/put-object).
+
 Place this fragment inside a full Environment JSON. Connectors run on the supervisor host with their own OSS configuration; the agent does not need storage credentials. Other CLI tools can implement the same one-file transfer contract. Trusted environment operators must supply the commands. `get_argv` and `put_argv` must each use `{uri}` and `{file}` exactly once. `input_hosts` restricts Turnyard's HTTPS attachment downloader only; default sandbox networking still permits outbound connections and is not a complete agent egress policy.
+
+**Updating configuration:** Older write configurations need `put_mode`, `not_found_exit_codes`, and a command that actually supports atomic creation. Adding fields alone cannot change command behavior. Session creation saves its environment; editing the source Environment JSON does not update existing sessions. Use the corrected configuration for new sessions. There is currently no command to update an existing session's environment in place.
+
+### Retrieve output records
 
 For text and PR URLs, the agent writes the invocation-scoped `/workspace/.turnyard-output/artifacts.json`:
 

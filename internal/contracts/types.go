@@ -162,13 +162,21 @@ type EnvironmentSpec struct {
 // ArtifactConnectorSpec is a trusted host-side byte transport. Work may only
 // select one of these preconfigured commands and a URI under its prefix.
 type ArtifactConnectorSpec struct {
-	ID             string   `json:"id"`
-	URIPrefix      string   `json:"uri_prefix"`
-	GetArgv        []string `json:"get_argv"`
-	PutArgv        []string `json:"put_argv,omitempty"`
-	PassEnv        []string `json:"pass_env,omitempty"`
-	TimeoutSeconds int      `json:"timeout_seconds,omitempty"`
+	ID                string           `json:"id"`
+	URIPrefix         string           `json:"uri_prefix"`
+	GetArgv           []string         `json:"get_argv"`
+	PutArgv           []string         `json:"put_argv,omitempty"`
+	PutMode           ConnectorPutMode `json:"put_mode,omitempty"`
+	NotFoundExitCodes []int            `json:"not_found_exit_codes,omitempty"`
+	PassEnv           []string         `json:"pass_env,omitempty"`
+	TimeoutSeconds    int              `json:"timeout_seconds,omitempty"`
 }
+
+type ConnectorPutMode string
+
+// ConnectorPutCreateOnly requires the trusted command to atomically reject an
+// existing object. A preliminary existence check alone does not satisfy it.
+const ConnectorPutCreateOnly ConnectorPutMode = "create-only"
 
 // ScopeRepo grants one task read or write access to a session repository.
 type ScopeRepo struct {

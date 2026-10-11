@@ -21,7 +21,7 @@ Sandbox security differs by backend. Docker `model-only` can block direct agent 
 
 ## Quick start
 
-This example uses Docker, OpenCode, and Ollama Cloud with an **existing, clean Go Git repository**. You need Go 1.27.1, Docker, Git, and a model API key. From the Turnyard repository root:
+This example uses Docker, OpenCode, and Ollama Cloud with an **existing, clean Go Git repository**. You need Go 1.27.2, Docker, Git, and a model API key. From the Turnyard repository root:
 
 ```sh
 go build -o bin/turnyard ./cmd/turnyard
@@ -73,7 +73,7 @@ The session and task commands start the local supervisor automatically if it is 
 
 ## Human input and recovery
 
-Use `task reply <task-id> --text "decision"` when a task is `needs_input`. `task verify <task-id>` reruns checks on the same failed candidate; `task retry <task-id>` starts another agent invocation. `task reconcile <task-id>` checkpoints a failed task. For an `unknown` task, the operator should first inspect the workspace, invocation logs, and external tool effects; reconcile confirms the containers have stopped, records an audit event, and makes the task retryable as `failed`. `checkpoint restore <checkpoint-id>` requires the workspace and native state directories to be absent so it cannot overwrite them.
+Use `task reply <task-id> --text "decision"` when a task is `needs_input`. `task verify <task-id>` reruns checks on the same failed candidate; `task retry <task-id>` starts another agent invocation. `task reconcile <task-id>` checkpoints a failed task. For an `unknown` task, the operator should first inspect the workspace, invocation logs, and external tool effects; reconcile confirms the containers have stopped, records an audit event, and makes the task retryable as `failed`. `checkpoint restore <checkpoint-id>` accepts only the latest checkpoint for that session and requires the workspace and native state directories to be absent. Historical IDs fail before extraction with `CHECKPOINT_NOT_CURRENT` and the latest ID in the error message. Checkpoints support interrupted work; historical checkpoints remain audit records rather than rollback targets.
 
 Append tasks to a session for the same requirement. `session complete` succeeds only after every task has a verified candidate and returns a candidate and deliverable manifest. An abandoned requirement can be ended with `session cancel` while no call is active. Terminal sessions cannot execute or restore work. See [lifecycle, delivery, and storage](lifecycle.md).
 
@@ -85,6 +85,8 @@ State defaults to `~/.local/share/turnyard`; set `TURNYARD_HOME` or prefix a com
 
 For checks maintained outside agent-writable code, see [task acceptance boundaries](acceptance.md).
 
-## License
+## Development and license
+
+Development checks include `go test -race ./...`, `go vet ./...`, `go tool staticcheck ./...`, and `go tool govulncheck ./...`. After changing an Ent schema, run `go generate ./internal/store` and inspect the generated diff. Tool versions are pinned in `go.mod`. Live agent and OCI tests require additional configuration; see [validation and limits](validation.md) for commands and scope.
 
 Turnyard is licensed under the [Apache License 2.0](../../LICENSE).

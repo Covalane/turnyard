@@ -37,7 +37,7 @@ func TestConnectorURIPrefixCannotEscapeOrChangeAuthority(t *testing.T) {
 
 func TestConnectorCatalogSeparatesReadAndWriteCapabilities(t *testing.T) {
 	catalog := connectorCatalog{"read": {URIPrefix: "oss://bucket/allowed/"},
-		"write": {URIPrefix: "oss://bucket/allowed/", PutArgv: []string{"ossutil", "cp"}}}
+		"write": {URIPrefix: "oss://bucket/allowed/", PutArgv: []string{"object-transfer", "create"}, PutMode: ConnectorPutCreateOnly, NotFoundExitCodes: []int{44}}}
 	if !catalog.canRead("read", "oss://bucket/allowed/input.png") || catalog.canWrite("read", "oss://bucket/allowed/{sha256}.png") {
 		t.Fatal("read-only connector gained write access or lost read access")
 	}
@@ -51,5 +51,26 @@ func TestConnectorCatalogSeparatesReadAndWriteCapabilities(t *testing.T) {
 	}
 	if catalog.canRead("missing", "oss://bucket/allowed/input.png") {
 		t.Fatal("missing connector was accepted")
+	}
+}
+
+func TestConnectorDeliveryRequiresExplicitSafeCommandContract(t *testing.T) {
+	valid := ArtifactConnectorSpec{ID: "object", PutArgv: []string{"transfer", "create", "{uri}", "{file}"},
+		PutMode: ConnectorPutCreateOnly, NotFoundExitCodes: []int{44}}
+	if err := ValidateConnectorDelivery(valid); err != nil {
+		t.Fatal(err)
+	}
+	for _, change := range []func(*ArtifactConnectorSpec){
+		func(spec *ArtifactConnectorSpec) { spec.PutMode = "" },
+		func(spec *ArtifactConnectorSpec) { spec.PutMode = "overwrite" },
+		func(spec *ArtifactConnectorSpec) { spec.NotFoundExitCodes = nil },
+		func(spec *ArtifactConnectorSpec) { spec.NotFoundExitCodes = []int{0} },
+		func(spec *ArtifactConnectorSpec) { spec.NotFoundExitCodes = []int{44, 44} },
+	} {
+		spec := valid
+		change(&spec)
+		if err := ValidateConnectorDelivery(spec); err == nil {
+			t.Fatalf("unsafe connector accepted: %+v", spec)
+		}
 	}
 }
