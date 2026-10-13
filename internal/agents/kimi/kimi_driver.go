@@ -46,9 +46,12 @@ func kimiConfig(binding contracts.ModelBinding, agent contracts.AgentSpec, env c
 	if err := agents.EnsureStateDirectory(state, root); err != nil {
 		return err
 	}
-	config := "default_model = " + strconv.Quote(kimiModelAlias) + "\ntelemetry = false\nauto_session_title = false\n" + "merge_all_available_skills = false\n" + "[providers.turnyard]\n" + "type = " + strconv.Quote(kimiProviderType) + "\n" + "base_url = " + strconv.Quote(baseURL) + "\n" + "api_key_env = " + strconv.Quote(binding.CredentialEnv) + "\n" + "[models." + kimiModelAlias + "]\nprovider = \"turnyard\"\n" + "model = " + strconv.Quote(binding.Model) + "\n" + "max_context_size = 131072\ncapabilities = [\"tool_use\"]\n" + "[loop_control]\nmax_steps_per_turn = 24\n" + "[background]\nprint_background_mode = \"drain\"\n" + "[[permission.rules]]\ndecision = \"deny\"\npattern = \"Bash(git push*)\"\n"
+	config := "default_model = " + strconv.Quote(kimiModelAlias) + "\ntelemetry = false\nauto_session_title = false\n" + "merge_all_available_skills = false\n" + "[providers.turnyard]\n" + "type = " + strconv.Quote(kimiProviderType) + "\n" + "base_url = " + strconv.Quote(baseURL) + "\n" + "api_key_env = " + strconv.Quote(binding.CredentialEnv) + "\n" + "[models." + kimiModelAlias + "]\nprovider = \"turnyard\"\n" + "model = " + strconv.Quote(binding.Model) + "\n" + "max_context_size = 131072\ncapabilities = [\"tool_use\"]\n" + "[background]\nprint_background_mode = \"drain\"\n" + "[[permission.rules]]\ndecision = \"deny\"\npattern = \"Bash(git push*)\"\n"
 	path := filepath.Join(root, "config.toml")
-	if err := agents.WritePinnedConfiguration(state, path, []byte(config), "Kimi configuration"); err != nil {
+	// Older releases imposed a 24-step cap on every native turn, including
+	// built-in children. Preserve the native default and task-level timeout.
+	legacy := strings.Replace(config, "[background]\n", "[loop_control]\nmax_steps_per_turn = 24\n[background]\n", 1)
+	if err := agents.WritePinnedAdditiveConfiguration(state, path, []byte(config), []byte(legacy), "Kimi configuration"); err != nil {
 		return err
 	}
 	for _, id := range agent.Skills {

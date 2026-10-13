@@ -14,6 +14,8 @@ A second attempt that day exposed Docker's default temporary mount preventing tr
 
 Run003 passed initial set and independent snapshot checks, then a later OpenCode invocation ended after a headless permission rejection. See the [third-attempt record](../zh/reviews/2026-10-13-gobase-run003-failure.md). The repaired live preflight, incomplete-stream parser tests, and immediate stop/restart regressions pass; they do not establish complete library acceptance.
 
+Run005 independent acceptance was twice stopped by the adapter-imposed Kimi 24-step cap. See the [native step-budget fix](../zh/reviews/2026-10-14-gobase-run005-failure.md). A deterministic offline model drives the real CLI through 25 steps with the new configuration and reproduces failure with the old cap. Local Go gates passed; the attempt was invalidated under the agreed restart rule and is not complete library acceptance.
+
 ## Verified paths
 
 | Path | Historical result and limit |
