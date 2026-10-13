@@ -56,6 +56,8 @@ bin/turnyard session complete <session-id>
 
 上述命令发现本机 supervisor 尚未运行时会自动启动它。需要显式管理进程时，可用 `bin/turnyard daemon start`、`bin/turnyard daemon status`、`bin/turnyard daemon stop`。`task run` 接受任务后即返回，supervisor 在后台继续执行；`task wait` 轮询至任务停止。有活动任务时 `daemon stop` 会拒绝关闭。Turnyard 尚无内置的开机自动重启服务管理器。
 
+在 Unix 上，自动启动的 supervisor 使用独立进程会话，启动客户端或其进程组退出后仍继续运行。停止 supervisor 应使用 `daemon stop`；主机重启后的启动仍由部署者的服务管理器负责。
+
 `session create` 默认允许 10 分钟准备仓库，可用 `--timeout <秒>` 调整，最大为 7200 秒。超时后用相同 `idempotency_key` 重试，先查询已有会话，再决定是否重新准备。
 
 ## 人工介入与恢复

@@ -8,6 +8,8 @@ Historical runs took place on September 26–29, 2026, across macOS Apple Silico
 
 The October 11 F1–F7 repairs and current Go, image, and Docker checks are recorded separately in the [review's repair section](../zh/reviews/2026-10-11-full-review.md#修复与复验2026-10-11), with an English summary. That round passed CLI startup, built-in human input, and Docker boundary probes on the new image; it did not repeat the historical cloud-model or external-service acceptance below.
 
+The October 13 gobase attempt exposed and fixed a Unix supervisor process-group lifecycle defect; see the [failure and repair record](../zh/reviews/2026-10-13-gobase-run001-failure.md), including its English summary. The real-CLI process regression and local repository checks pass. The interrupted attempt produced no accepted library candidate and does not count as a completed library or model-path acceptance run.
+
 ## Verified paths
 
 | Path | Historical result and limit |

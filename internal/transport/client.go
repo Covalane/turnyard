@@ -153,6 +153,7 @@ func StartDaemon(ctx context.Context, home string) error {
 	cmd.Stdin = nil
 	cmd.Stdout = log
 	cmd.Stderr = log
+	configureDaemonProcess(cmd)
 	if err := cmd.Start(); err != nil {
 		return fault.Wrap(fault.CodeDaemonFailed, "start supervisor", err, "supervisor did not start")
 	}

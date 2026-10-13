@@ -69,6 +69,8 @@ Use `session publish <session-id>` for explicitly enabled remote Git writes, `se
 
 The session and task commands start the local supervisor automatically if it is absent. Use `bin/turnyard daemon start`, `bin/turnyard daemon status`, and `bin/turnyard daemon stop` for explicit process control. `daemon stop` refuses to stop during active work. Turnyard does not include a service manager to restart the supervisor after a machine reboot.
 
+On Unix, the automatically started supervisor uses an independent process session and survives the exit of the starting client or its process group. Use `daemon stop` to stop it; startup after a host reboot remains the deployment service manager's responsibility.
+
 `session create` allows 10 minutes for repository preparation by default. Set `--timeout <seconds>` to change it, up to 7200 seconds. After a timeout, retry with the same `idempotency_key` so Turnyard checks for an existing session first.
 
 ## Human input and recovery
