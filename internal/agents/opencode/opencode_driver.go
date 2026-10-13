@@ -163,14 +163,11 @@ func (Driver) Invoke(ctx context.Context, input agents.AgentInvocation) (agents.
 	if err != nil {
 		return output, err
 	}
-	if run.TimedOut {
-		return output, agents.MainRunError(run, "OpenCode")
+	if err := agents.MainRunError(run, "OpenCode"); err != nil {
+		return output, err
 	}
 	parsed, err := parseOpenCodeEvents(run.Output)
 	if err != nil {
-		return output, err
-	}
-	if err := agents.MainRunError(run, "OpenCode"); err != nil {
 		return output, err
 	}
 	if parsed.NativeID == "" {
