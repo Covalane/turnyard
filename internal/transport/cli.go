@@ -147,7 +147,7 @@ func runCLI(ctx context.Context, args []string) (map[string]any, error) {
 		case cliVerbStatus:
 			return ClientRequest(ctx, home, Request{Action: actionPing}, false)
 		case cliVerbStop:
-			return ClientRequest(ctx, home, Request{Action: actionDaemonStop}, false)
+			return StopDaemon(ctx, home)
 		default:
 			return nil, fault.New(fault.CodeInvalidRequest, "unknown %s action", cliCommandDaemon)
 		}

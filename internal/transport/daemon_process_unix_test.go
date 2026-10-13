@@ -37,7 +37,7 @@ func TestDaemonSurvivesLauncherProcessGroup(t *testing.T) {
 	defer func() {
 		stopCtx, stop := context.WithTimeout(context.Background(), 5*time.Second)
 		defer stop()
-		if _, err := ClientRequest(stopCtx, home, Request{Action: actionDaemonStop}, false); err != nil {
+		if _, err := StopDaemon(stopCtx, home); err != nil {
 			t.Errorf("stop test supervisor: %v", err)
 		}
 		if launcher.ProcessState == nil {
@@ -85,5 +85,17 @@ func TestDaemonSurvivesLauncherProcessGroup(t *testing.T) {
 	after, err := decodeClientResult[daemonStatus](response)
 	if err != nil || after.PID != status.PID {
 		t.Fatalf("supervisor was replaced instead of surviving: %+v, %v", after, err)
+	}
+	// Repeat stop/start without sleeping. Stop must confirm lock release before
+	// returning so the next real CLI can immediately own this state directory.
+	for range 3 {
+		stop := exec.CommandContext(ctx, binary, "--home", home, "daemon", "stop")
+		if output, err := stop.CombinedOutput(); err != nil {
+			t.Fatalf("stop CLI: %v\n%s", err, output)
+		}
+		start := exec.CommandContext(ctx, binary, "--home", home, "daemon", "start")
+		if output, err := start.CombinedOutput(); err != nil {
+			t.Fatalf("immediate restart CLI: %v\n%s", err, output)
+		}
 	}
 }

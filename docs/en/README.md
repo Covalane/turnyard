@@ -71,6 +71,8 @@ The session and task commands start the local supervisor automatically if it is 
 
 On Unix, the automatically started supervisor uses an independent process session and survives the exit of the starting client or its process group. Use `daemon stop` to stop it; startup after a host reboot remains the deployment service manager's responsibility.
 
+`daemon stop` waits for release of the state-directory lock before returning, allowing an immediate restart. It refuses active invocations; a bounded shutdown timeout returns an error and must not be treated as confirmed completion.
+
 `session create` allows 10 minutes for repository preparation by default. Set `--timeout <seconds>` to change it, up to 7200 seconds. After a timeout, retry with the same `idempotency_key` so Turnyard checks for an existing session first.
 
 ## Human input and recovery

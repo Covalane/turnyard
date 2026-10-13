@@ -27,11 +27,15 @@ func prepareOpenCode(env contracts.EnvironmentSpec, agent contracts.AgentSpec, b
 		return "", err
 	}
 	config := map[string]any{"$schema": "https://opencode.ai/config.json", "provider": map[string]any{binding.Provider: map[string]any{"npm": "@ai-sdk/openai-compatible", "name": provider.Name, "options": map[string]any{"baseURL": endpoint, "apiKey": "{env:" + binding.CredentialEnv + "}"}, "models": map[string]any{binding.Model: map[string]any{"name": binding.Model}}}}}
+	// Native approval prompts cannot be answered in a headless invocation.
+	// Filesystem, network, credentials and MCP grants are enforced by Turnyard's
+	// sandbox and gateway; image toolchains outside /workspace must stay usable.
+	config["permission"] = map[string]any{"external_directory": "allow"}
 	if len(agent.Delegates) > 0 {
 		// Delegation handoffs live on a read-only mount outside the workspace.
 		// OpenCode also requires explicit permission to read that external path.
 		config["permission"] = map[string]any{
-			"external_directory": map[string]string{"/turnyard-control/delegations/**": "allow"},
+			"external_directory": "allow",
 			"edit":               map[string]string{"/turnyard-control/delegations/**": "deny"},
 		}
 	}
@@ -150,7 +154,7 @@ func (Driver) Invoke(ctx context.Context, input agents.AgentInvocation) (agents.
 			return output, fault.New(fault.CodeNativeSessionMismatch, "native session does not belong to /workspace")
 		}
 	}
-	command := []string{"run", "--dir", "/workspace", "--format", "json", "--model", model}
+	command := []string{"run", "--auto", "--dir", "/workspace", "--format", "json", "--model", model}
 	if input.NativeID != "" {
 		command = append(command, "--session", input.NativeID)
 	}

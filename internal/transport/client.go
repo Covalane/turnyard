@@ -8,10 +8,12 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"syscall"
 	"time"
 
 	"github.com/Covalane/turnyard/internal/contracts"
 	"github.com/Covalane/turnyard/internal/fault"
+	"github.com/Covalane/turnyard/internal/stateops"
 )
 
 func DefaultHome() string {
@@ -172,4 +174,40 @@ func StartDaemon(ctx context.Context, home string) error {
 		}
 	}
 	return fault.New(fault.CodeDaemonFailed, "supervisor did not start; inspect daemon.log")
+}
+
+const (
+	supervisorStopTimeout      = 10 * time.Second
+	supervisorLockPollInterval = 20 * time.Millisecond
+)
+
+// StopDaemon waits for the exclusive state lock to be released. The RPC
+// acknowledgement means shutdown was requested, not that closing the store
+// has finished; returning earlier makes an immediate restart race shutdown.
+func StopDaemon(ctx context.Context, home string) (map[string]any, error) {
+	result, err := ClientRequest(ctx, home, Request{Action: actionDaemonStop}, false)
+	if err != nil {
+		return nil, err
+	}
+	waitCtx, cancel := context.WithTimeout(ctx, supervisorStopTimeout)
+	defer cancel()
+	ticker := time.NewTicker(supervisorLockPollInterval)
+	defer ticker.Stop()
+	for {
+		lock, err := stateops.Acquire(home)
+		if err == nil {
+			if err := lock.Close(); err != nil {
+				return nil, fault.Wrap(fault.CodeDaemonFailed, "confirm supervisor stop", err, "state lock could not be released")
+			}
+			return result, nil
+		}
+		if !errors.Is(err, syscall.EWOULDBLOCK) && !errors.Is(err, syscall.EAGAIN) {
+			return nil, fault.Wrap(fault.CodeDaemonFailed, "confirm supervisor stop", err, "cannot inspect state lock")
+		}
+		select {
+		case <-waitCtx.Done():
+			return nil, fault.Wrap(fault.CodeDaemonFailed, "wait for supervisor stop", waitCtx.Err(), "supervisor did not release its state lock")
+		case <-ticker.C:
+		}
+	}
 }

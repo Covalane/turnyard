@@ -17,6 +17,7 @@ type Code string
 
 const (
 	CodeAgentFailed            Code = "AGENT_FAILED"
+	CodeAgentIncomplete        Code = "AGENT_INCOMPLETE"
 	CodeAgentOutputInvalid     Code = "AGENT_OUTPUT_INVALID"
 	CodeAgentOutputTruncated   Code = "AGENT_OUTPUT_TRUNCATED"
 	CodeAgentTimeout           Code = "AGENT_TIMEOUT"

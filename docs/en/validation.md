@@ -12,6 +12,8 @@ The October 13 gobase attempt exposed and fixed a Unix supervisor process-group 
 
 A second attempt that day exposed Docker's default temporary mount preventing trusted Go-test execution. See the [temporary-directory repair record](../zh/reviews/2026-10-13-gobase-run002-failure.md). The new real compile/test regression uses a readonly repository; Docker file, network, and credential boundaries were checked separately. No library candidate from that attempt has been accepted.
 
+Run003 passed initial set and independent snapshot checks, then a later OpenCode invocation ended after a headless permission rejection. See the [third-attempt record](../zh/reviews/2026-10-13-gobase-run003-failure.md). The repaired live preflight, incomplete-stream parser tests, and immediate stop/restart regressions pass; they do not establish complete library acceptance.
+
 ## Verified paths
 
 | Path | Historical result and limit |

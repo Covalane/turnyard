@@ -17,9 +17,10 @@ type openCodeEvent struct {
 	Type      string `json:"type"`
 	SessionID string `json:"sessionID"`
 	Part      struct {
-		Type  string `json:"type"`
-		Tool  string `json:"tool"`
-		State struct {
+		Type   string               `json:"type"`
+		Tool   string               `json:"tool"`
+		Reason openCodeFinishReason `json:"reason"`
+		State  struct {
 			Status string `json:"status"`
 			Input  struct {
 				Name string `json:"name"`
@@ -28,11 +29,19 @@ type openCodeEvent struct {
 	} `json:"part"`
 }
 
+type openCodeFinishReason string
+
+const (
+	openCodeStepFinish                      = "step_finish"
+	openCodeFinishStop openCodeFinishReason = "stop"
+)
+
 func parseOpenCodeEvents(output string) (agents.AgentResult, error) {
 	result := agents.AgentResult{}
 	ids := collections.Set[string]{}
 	called := collections.Set[string]{}
 	loaded := collections.Set[string]{}
+	var finalReason openCodeFinishReason
 	for _, line := range strings.Split(output, "\n") {
 		var event openCodeEvent
 		if json.Unmarshal([]byte(line), &event) != nil || event.Type == "" {
@@ -41,6 +50,9 @@ func parseOpenCodeEvents(output string) (agents.AgentResult, error) {
 		result.Events = append(result.Events, json.RawMessage(line))
 		if event.SessionID != "" {
 			ids.Add(event.SessionID)
+		}
+		if event.Type == openCodeStepFinish {
+			finalReason = event.Part.Reason
 		}
 		if event.Type != "tool_use" || event.Part.State.Status != "completed" || event.Part.Tool == "" {
 			continue
@@ -58,6 +70,12 @@ func parseOpenCodeEvents(output string) (agents.AgentResult, error) {
 	}
 	result.CalledTools = agents.SortedKeys(called)
 	result.LoadedSkills = agents.SortedKeys(loaded)
+	// Exit zero can also mean a headless permission rejection ended the CLI
+	// while the last model step was still asking to call tools. Require the
+	// runtime's explicit terminal reason rather than treating exit zero as done.
+	if finalReason != openCodeFinishStop {
+		return result, fault.New(fault.CodeAgentIncomplete, "OpenCode ended without a completed model turn (finish reason %q)", finalReason)
+	}
 	return result, nil
 }
 

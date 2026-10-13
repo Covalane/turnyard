@@ -58,6 +58,8 @@ bin/turnyard session complete <session-id>
 
 在 Unix 上，自动启动的 supervisor 使用独立进程会话，启动客户端或其进程组退出后仍继续运行。停止 supervisor 应使用 `daemon stop`；主机重启后的启动仍由部署者的服务管理器负责。
 
+`daemon stop` 会等待状态目录锁释放，确认停止后才返回，以便立即重新启动。不能在活动调用期间停止；等待超过有界期限时返回错误，不能把该错误当作停止完成。
+
 `session create` 默认允许 10 分钟准备仓库，可用 `--timeout <秒>` 调整，最大为 7200 秒。超时后用相同 `idempotency_key` 重试，先查询已有会话，再决定是否重新准备。
 
 ## 人工介入与恢复
