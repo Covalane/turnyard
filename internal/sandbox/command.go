@@ -21,7 +21,8 @@ func (b OCIBackend) buildCommand(input SandboxRun, extraOptions []string) (*exec
 	}
 	cpus, memory := EffectiveResources(input.Sandbox)
 	args := []string{"run", "--rm", "--name", input.Name, "--cpus", fmt.Sprint(cpus),
-		"--memory", fmt.Sprintf("%dm", memory), "--read-only", "--tmpfs", "/tmp"}
+		"--memory", fmt.Sprintf("%dm", memory), "--read-only"}
+	args = append(args, b.dialect.TemporaryMountOptions(memory)...)
 	// Bind mounts are owned by the supervisor account. Match that identity in
 	// OCI runtimes so private state stays writable without broad host ACLs.
 	args = append(args, b.dialect.UserOptions(os.Getuid(), os.Getgid())...)

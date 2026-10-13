@@ -75,10 +75,12 @@ func (b OCIBackend) startToolGateway(ctx context.Context, input SandboxRun, mode
 	}
 	args := []string{"run", "-d", "--name", lease.name, "--network", lease.network,
 		"--network-alias", "turnyard-tools", "--cap-drop", "ALL", "--security-opt", "no-new-privileges",
-		"--read-only", "--tmpfs", "/tmp", "--tmpfs", "/state:rw,exec,mode=1777", "--user", fmt.Sprintf("%d:%d", os.Getuid(), os.Getgid()),
+		"--read-only", "--tmpfs", "/state:rw,exec,mode=1777", "--user", fmt.Sprintf("%d:%d", os.Getuid(), os.Getgid()),
 		"--mount", fmt.Sprintf("type=bind,source=%s,target=/state/home", toolHome),
 		"--mount", fmt.Sprintf("type=bind,source=%s,target=/state/tool-gateway,readonly", filepath.Join(input.State, "tool-gateway")),
 		"--mount", fmt.Sprintf("type=bind,source=%s,target=/turnyard-catalog", input.ToolGateway.CatalogDir)}
+	_, memory := EffectiveResources(input.Sandbox)
+	args = append(args, b.dialect.TemporaryMountOptions(memory)...)
 	for _, name := range []string{"tools", "tool-config"} {
 		source := filepath.Join(input.State, name)
 		if info, err := os.Lstat(source); err == nil && info.IsDir() && info.Mode()&os.ModeSymlink == 0 {

@@ -2,6 +2,8 @@
 
 [User guide](README.md) · [中文](../zh/architecture.md)
 
+Docker/Podman task and tool processes can compile and execute temporary programs on private `/tmp`. The mount retains `nosuid` and `nodev`; its capacity is at most 1 GiB and half the task's declared memory. Product repositories and sealed outputs remain readonly during trusted checks. This temporary-storage policy does not imply equivalent CPU/memory hard limits for every sidecar. Apple `container` uses its own mount syntax and requires separate validation.
+
 ## Execution path
 
 Turnyard owns one machine and its state directory. A separate system chooses task order and the execution machine, then uses the local CLI to submit inputs and read status and results. Turnyard does not allocate tasks across machines or share session state between them. One supervisor can serve multiple sessions continuously, with one active task at a time per session.

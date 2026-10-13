@@ -27,6 +27,9 @@ func (Dialect) UserOptions(uid, gid int) []string {
 func (Dialect) RunOptions(network contracts.SandboxNetworkPolicy) ([]string, error) {
 	return ocicli.RunOptions(network)
 }
+func (Dialect) TemporaryMountOptions(memoryMB int) []string {
+	return ocicli.TemporaryMountOptions(memoryMB)
+}
 func (d Dialect) ImageIdentity(ctx context.Context, image string) (string, error) {
 	return ocicli.ImageIdentity(ctx, d.Binary(), image)
 }

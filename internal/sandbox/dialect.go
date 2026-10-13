@@ -17,5 +17,6 @@ type Dialect interface {
 	DeleteArgs(string) []string
 	RunOptions(network contracts.SandboxNetworkPolicy) ([]string, error)
 	UserOptions(uid, gid int) []string
+	TemporaryMountOptions(memoryMB int) []string
 	IsolationOptions(context.Context, contracts.SandboxIsolationProfile) ([]string, error)
 }

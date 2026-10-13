@@ -55,5 +55,6 @@ jobs:
           TURNYARD_E2E_IMAGE: turnyard-agent:ci
         run: |
           go test -count=1 -run '^TestRealSandboxFaults$' ./internal/sandbox
+          go test -count=1 -run '^TestReadonlyGoBuildAndTest$' ./internal/sandbox
           go test -tags integration -count=1 -run '^Test(ModelOnlyDockerBoundary|ModelGatewayCannotBeUsedFromBridge|ToolGatewayKeepsCredentialOutsideAgent)$' ./internal/sandbox
           go test -tags integration -count=1 -run '^TestBuiltinInputLocalGateway$' ./internal/agents

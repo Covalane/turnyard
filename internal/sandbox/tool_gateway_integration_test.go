@@ -36,7 +36,7 @@ func TestToolGatewayKeepsCredentialOutsideAgent(t *testing.T) {
 	if err := os.WriteFile(filepath.Join(state, "native-secret"), []byte("agent-only"), 0o600); err != nil {
 		t.Fatal(err)
 	}
-	script := "#!/bin/sh\nif [ -e /state/native-secret ]; then exit 8; fi\nif [ \"$TOOL_SECRET\" = \"docker-test-secret\" ]; then printf 'SECRET_OK\\n'; else exit 7; fi\n"
+	script := "#!/bin/sh\nif [ -e /state/native-secret ]; then exit 8; fi\nif ! cp /bin/true /tmp/tool-exec-probe || ! /tmp/tool-exec-probe; then exit 9; fi\nif [ \"$TOOL_SECRET\" = \"docker-test-secret\" ]; then printf 'SECRET_OK\\n'; else exit 7; fi\n"
 	if err := os.WriteFile(filepath.Join(state, "tools", "secret_tool", "check.sh"), []byte(script), 0o700); err != nil {
 		t.Fatal(err)
 	}

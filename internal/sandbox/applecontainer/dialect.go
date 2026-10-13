@@ -26,6 +26,11 @@ func (Dialect) Binary() string                  { return "container" }
 func (Dialect) UserOptions(_, _ int) []string   { return nil }
 func (Dialect) ListArgs() []string              { return []string{"list", "--all"} }
 func (Dialect) DeleteArgs(name string) []string { return []string{"delete", "--force", name} }
+func (Dialect) TemporaryMountOptions(_ int) []string {
+	// Apple container has its own tmpfs parser; do not pass Docker's colon
+	// options to it. Its existing isolated guest mount remains unchanged.
+	return []string{"--tmpfs", ocicli.TemporaryMountPath}
+}
 func (Dialect) RunOptions(network contracts.SandboxNetworkPolicy) ([]string, error) {
 	switch network {
 	case "", contracts.SandboxNetworkDefault:

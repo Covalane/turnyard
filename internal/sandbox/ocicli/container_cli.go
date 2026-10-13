@@ -3,6 +3,7 @@ package ocicli
 
 import (
 	"context"
+	"fmt"
 	"os/exec"
 	"strings"
 	"time"
@@ -21,6 +22,19 @@ const (
 
 func ListArgs() []string              { return []string{"ps", "-a", "--format", "{{.Names}}"} }
 func DeleteArgs(name string) []string { return []string{"rm", "-f", name} }
+
+const (
+	TemporaryMountPath = "/tmp"
+	maxTemporaryMB     = 1024
+)
+
+// TemporaryMountOptions permits compiler/test executables on private tmpfs.
+// Keep device and set-ID restrictions and bound it within container memory;
+// Docker's implicit noexec default otherwise breaks ordinary go test commands.
+func TemporaryMountOptions(memoryMB int) []string {
+	capacity := max(1, min(maxTemporaryMB, memoryMB/2))
+	return []string{"--tmpfs", fmt.Sprintf("%s:rw,exec,nosuid,nodev,size=%dm,mode=1777", TemporaryMountPath, capacity)}
+}
 
 func RunOptions(network contracts.SandboxNetworkPolicy) ([]string, error) {
 	args := []string{"--cap-drop", "ALL", "--security-opt", "no-new-privileges"}

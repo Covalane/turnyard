@@ -10,6 +10,8 @@ The October 11 F1–F7 repairs and current Go, image, and Docker checks are reco
 
 The October 13 gobase attempt exposed and fixed a Unix supervisor process-group lifecycle defect; see the [failure and repair record](../zh/reviews/2026-10-13-gobase-run001-failure.md), including its English summary. The real-CLI process regression and local repository checks pass. The interrupted attempt produced no accepted library candidate and does not count as a completed library or model-path acceptance run.
 
+A second attempt that day exposed Docker's default temporary mount preventing trusted Go-test execution. See the [temporary-directory repair record](../zh/reviews/2026-10-13-gobase-run002-failure.md). The new real compile/test regression uses a readonly repository; Docker file, network, and credential boundaries were checked separately. No library candidate from that attempt has been accepted.
+
 ## Verified paths
 
 | Path | Historical result and limit |
